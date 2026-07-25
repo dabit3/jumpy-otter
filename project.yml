@@ -1,0 +1,32 @@
+name: JumpyOtter
+options:
+  bundleIdPrefix: com.devin
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+targets:
+  JumpyOtter:
+    type: application
+    platform: iOS
+    sources:
+      - path: JumpyOtter/Sources
+      - path: JumpyOtter/Resources
+    info:
+      path: JumpyOtter/Info.plist
+      properties:
+        CFBundleDisplayName: Jumpy Otter
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIStatusBarHidden: true
+        UIViewControllerBasedStatusBarAppearance: false
+        UIRequiresFullScreen: true
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: false
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_VERSION: "5.9"
+        PRODUCT_BUNDLE_IDENTIFIER: com.devin.jumpyotter
+        CODE_SIGN_STYLE: Automatic
+
