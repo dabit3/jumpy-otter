@@ -1,5 +1,7 @@
 # Jumpy Otter
 
+[![Built with Devin](https://img.shields.io/badge/Built%20with-Devin-blue)](https://devin.ai)
+
 Jumpy Otter is a voxel-style iOS arcade game set in San Francisco. Guide Devin the otter through traffic, trains, and the bay while collecting creatine bottles.
 
 ## Run in Xcode
