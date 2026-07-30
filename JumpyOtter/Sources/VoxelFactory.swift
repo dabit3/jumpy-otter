@@ -253,7 +253,7 @@ enum VoxelFactory {
         root.addChildNode(box(w: 0.1, h: 1.1, l: 0.1, color: Palette.black, y: 0.55))
         root.addChildNode(box(w: 0.52, h: 0.3, l: 0.12, color: Palette.black, y: 1.18))
         for (name, dx) in [("lightA", Float(-0.14)), ("lightB", Float(0.14))] {
-            let geo = SCNSphere(radius: 0.085)
+            let geo = SCNSphere(radius: 0.12)
             let mat = SCNMaterial()
             mat.diffuse.contents = UIColor(red: 0.4, green: 0.05, blue: 0.05, alpha: 1)
             mat.emission.contents = UIColor.black
