@@ -255,9 +255,9 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         case .idle:
             if row.trainTimer <= 0 && nearPlayer {
                 row.trainPhase = .warning
-                row.trainTimer = 1.1
+                row.trainTimer = 2.4
                 row.blinkTimer = 0
-                if abs(row.index - playerRow) < 10 { SoundManager.shared.play("bell", volume: 0.8) }
+                if abs(row.index - playerRow) < 14 { SoundManager.shared.play("bell", volume: 1.0) }
             }
         case .warning:
             row.blinkTimer -= dt
@@ -265,6 +265,9 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
                 row.blinkTimer = 0.18
                 row.blinkOn.toggle()
                 setSignal(row, litA: row.blinkOn, litB: !row.blinkOn)
+                if row.blinkOn && abs(row.index - playerRow) < 14 {
+                    SoundManager.shared.play("bell", volume: 0.5)
+                }
             }
             if row.trainTimer <= 0 {
                 row.trainPhase = .running
