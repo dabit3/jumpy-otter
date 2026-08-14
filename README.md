@@ -41,6 +41,12 @@ python3 -m venv .relay-venv
 .relay-venv/bin/python relay.py   # listens on ws://127.0.0.1:8765
 ```
 
+Optional protocol check (with the relay running):
+
+```sh
+.relay-venv/bin/python scripts/test_relay.py
+```
+
 Then launch the game in up to four simulators — each client connects to the
 relay automatically at startup (and silently stays single-player if the relay
 isn't running). Rivals appear as translucent ghost otters with a colored
