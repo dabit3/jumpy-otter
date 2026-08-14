@@ -19,6 +19,7 @@
 		9256F72B72D9B67DD75B165E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C5CE92272406B4A973E64CB /* AppDelegate.swift */; };
 		92E3D7F951624254D5F4BBDF /* Terrain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1D894B6D62B4B882E60FFA /* Terrain.swift */; };
 		A30815D266A1E2F1A6500776 /* train.wav in Resources */ = {isa = PBXBuildFile; fileRef = F7A81EF3D49D2E1128940B77 /* train.wav */; };
+		A9F21748EF3EE2C2772AE94B /* MultiplayerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D5B67C25B4BA2AA1BE06F3E /* MultiplayerClient.swift */; };
 		D0BE247EAF180133F66DEECA /* hit.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A4E898EA02045558194BE21 /* hit.wav */; };
 		D4B8E34F603AF65156E3E55F /* bump.wav in Resources */ = {isa = PBXBuildFile; fileRef = A0C88AE5048EFD3BC5A6254C /* bump.wav */; };
 		EEFBE97EB2659F868B1B4752 /* bell.wav in Resources */ = {isa = PBXBuildFile; fileRef = C251546244D69FB08D33EEEE /* bell.wav */; };
@@ -34,6 +35,7 @@
 		2F1D894B6D62B4B882E60FFA /* Terrain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Terrain.swift; sourceTree = "<group>"; };
 		7A4E898EA02045558194BE21 /* hit.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = hit.wav; sourceTree = "<group>"; };
 		7C5CE92272406B4A973E64CB /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		8D5B67C25B4BA2AA1BE06F3E /* MultiplayerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiplayerClient.swift; sourceTree = "<group>"; };
 		9C12C71B302BF39D33E5216D /* SoundManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundManager.swift; sourceTree = "<group>"; };
 		A0C88AE5048EFD3BC5A6254C /* bump.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = bump.wav; sourceTree = "<group>"; };
 		C031741BF006F109FB749852 /* VoxelFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoxelFactory.swift; sourceTree = "<group>"; };
@@ -53,6 +55,7 @@
 				F4A73CF955DC8F98F6DCEA76 /* Const.swift */,
 				0DCF35DEE85585F77BF4F4E2 /* GameController.swift */,
 				DFDBE527D4F5655ACDD496DE /* GameViewController.swift */,
+				8D5B67C25B4BA2AA1BE06F3E /* MultiplayerClient.swift */,
 				9C12C71B302BF39D33E5216D /* SoundManager.swift */,
 				2F1D894B6D62B4B882E60FFA /* Terrain.swift */,
 				C031741BF006F109FB749852 /* VoxelFactory.swift */,
@@ -191,6 +194,7 @@
 				540F2FCCE432011AC9EAFBC8 /* Const.swift in Sources */,
 				211C8EB049949496AA5B4351 /* GameController.swift in Sources */,
 				27BAF24C907596F240C78156 /* GameViewController.swift in Sources */,
+				A9F21748EF3EE2C2772AE94B /* MultiplayerClient.swift in Sources */,
 				FE194FF937E61FDBCAB74114 /* SoundManager.swift in Sources */,
 				92E3D7F951624254D5F4BBDF /* Terrain.swift in Sources */,
 				3C46BD5E63278AF5A54114C0 /* VoxelFactory.swift in Sources */,

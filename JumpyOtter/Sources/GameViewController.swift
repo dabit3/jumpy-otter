@@ -10,6 +10,9 @@ final class GameViewController: UIViewController, GameHUD {
     private let scoreLabel = UILabel()
     private let creatineIcon = UIView()
     private let creatineLabel = UILabel()
+    private let rivalStack = UIStackView()
+    private var rivalLabels: [Int: UILabel] = [:]
+    private let bannerLabel = UILabel()
 
     // Title overlay
     private let titleStack = UIStackView()
@@ -125,6 +128,28 @@ final class GameViewController: UIViewController, GameHUD {
             creatineIcon.trailingAnchor.constraint(equalTo: creatineLabel.leadingAnchor, constant: -8),
             creatineIcon.widthAnchor.constraint(equalToConstant: 20),
             creatineIcon.heightAnchor.constraint(equalToConstant: 26),
+        ])
+
+        // rival mini-status strip (multiplayer)
+        rivalStack.axis = .vertical
+        rivalStack.spacing = 4
+        rivalStack.alignment = .trailing
+        rivalStack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(rivalStack)
+        NSLayoutConstraint.activate([
+            rivalStack.topAnchor.constraint(equalTo: creatineLabel.bottomAnchor, constant: 10),
+            rivalStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+        ])
+
+        // event banner (joins, attacks, win)
+        bannerLabel.textAlignment = .center
+        styleOutlined(bannerLabel, size: 24)
+        bannerLabel.alpha = 0
+        bannerLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(bannerLabel)
+        NSLayoutConstraint.activate([
+            bannerLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            bannerLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 70),
         ])
     }
 
@@ -284,5 +309,43 @@ final class GameViewController: UIViewController, GameHUD {
     private func hideGameOver() {
         gameOverPanel.isHidden = true
         scoreLabel.text = "0"
+    }
+
+    // MARK: - Multiplayer HUD
+
+    func hudSetRivals(_ rivals: [RivalStatus]) {
+        DispatchQueue.main.async {
+            let ids = Set(rivals.map(\.id))
+            for (id, label) in self.rivalLabels where !ids.contains(id) {
+                label.removeFromSuperview()
+                self.rivalLabels.removeValue(forKey: id)
+            }
+            for rival in rivals {
+                let label: UILabel
+                if let existing = self.rivalLabels[rival.id] {
+                    label = existing
+                } else {
+                    label = UILabel()
+                    self.styleOutlined(label, size: 18)
+                    self.rivalLabels[rival.id] = label
+                    self.rivalStack.addArrangedSubview(label)
+                }
+                label.textColor = Palette.rivalColor(rival.id)
+                label.text = "P\(rival.id + 1)  \(rival.score)" + (rival.alive ? "" : "  ✕")
+                label.alpha = rival.alive ? 1 : 0.45
+            }
+        }
+    }
+
+    func hudBanner(_ text: String, color: UIColor) {
+        DispatchQueue.main.async {
+            self.bannerLabel.text = text
+            self.bannerLabel.textColor = color
+            self.bannerLabel.layer.removeAllAnimations()
+            self.bannerLabel.alpha = 1
+            UIView.animate(withDuration: 0.5, delay: 1.8, options: []) {
+                self.bannerLabel.alpha = 0
+            }
+        }
     }
 }

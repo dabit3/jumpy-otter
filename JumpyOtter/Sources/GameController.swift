@@ -7,6 +7,14 @@ protocol GameHUD: AnyObject {
     func hudGameOver(score: Int, best: Int, creatine: Int)
     func hudStarted()
     func hudShowTitle()
+    func hudSetRivals(_ rivals: [RivalStatus])
+    func hudBanner(_ text: String, color: UIColor)
+}
+
+struct RivalStatus {
+    let id: Int
+    let score: Int
+    let alive: Bool
 }
 
 final class GameController: NSObject, SCNSceneRendererDelegate {
@@ -67,6 +75,19 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
 
     private var eagleNode: SCNNode?
 
+    // multiplayer
+    private let mp = MultiplayerClient()
+    private final class Peer {
+        var score = 0
+        var alive = true
+        var ghost: SCNNode?
+    }
+    private var peers: [Int: Peer] = [:]
+    private var hazardBoostTimer: Float = 0
+    private var stateSendTimer: Float = 0
+    private var lastSentState: (row: Int, x: Float)?
+    private var announcedWin = false
+
     // MARK: - Setup
 
     override init() {
@@ -77,6 +98,7 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         setupCamera()
         setupLights()
         startFresh()
+        mp.connect()
     }
 
     private func setupCamera() {
@@ -149,6 +171,10 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
 
         inputLock.lock(); inputQueue.removeAll(); inputLock.unlock()
 
+        announcedWin = false
+        lastSentState = nil
+        mp.sendState(row: 0, x: 0, score: 0, alive: true)
+
         hud?.hudSetScore(0)
         hud?.hudSetCreatine(totalCreatine)
     }
@@ -211,6 +237,7 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         let dt = Float(min(time - lastTime, 1.0 / 30.0))
         lastTime = time
 
+        processMultiplayer(dt: dt)
         updateRows(dt: dt)
         if autopilot { runAutopilot(dt: dt) }
         if state == .playing {
@@ -230,11 +257,13 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         let camRow = Int(cameraRig.position.z.rounded())
         terrain.ensure(from: camRow - K.rowsBehindKeep, to: max(camRow, playerRow) + K.rowsAhead)
 
+        let hazardBoost: Float = hazardBoostTimer > 0 ? K.garbageSpeedBoost : 1
         for (_, row) in terrain.rows {
             switch row.kind {
             case .road, .river:
+                let boost = row.kind == .road ? hazardBoost : 1
                 for obj in row.objects {
-                    obj.x += row.dir * row.speed * dt
+                    obj.x += row.dir * row.speed * boost * dt
                     if obj.x > K.wrapHalf { obj.x -= K.wrapHalf * 2 }
                     if obj.x < -K.wrapHalf { obj.x += K.wrapHalf * 2 }
                     obj.node.position.x = obj.x
@@ -390,12 +419,15 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
             totalCreatine += 1
             UserDefaults.standard.set(totalCreatine, forKey: "totalCreatine")
             SoundManager.shared.play("coin", volume: 0.9)
+            mp.sendGarbage(amount: 1)
             bottle.runAction(.sequence([
                 .group([.moveBy(x: 0, y: 1.2, z: 0, duration: 0.25), .fadeOut(duration: 0.25)]),
                 .removeFromParentNode(),
             ]))
             hud?.hudSetCreatine(totalCreatine)
         }
+
+        sendStateIfChanged()
 
         // river landing: find a log or drown
         if row.kind == .river {
@@ -563,6 +595,122 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
             UserDefaults.standard.set(best, forKey: "best")
         }
         hud?.hudGameOver(score: score, best: best, creatine: totalCreatine)
+        mp.sendGameOver(score: score)
+        mp.sendState(row: playerRow, x: playerX, score: score, alive: false)
+    }
+
+    // MARK: - Multiplayer
+
+    private func processMultiplayer(dt: Float) {
+        if hazardBoostTimer > 0 { hazardBoostTimer -= dt }
+
+        var rosterChanged = false
+        for event in mp.drainEvents() {
+            switch event {
+            case .connected(_, let peerIDs):
+                for id in peerIDs { addPeer(id) }
+                rosterChanged = true
+            case .peerJoined(let id):
+                addPeer(id)
+                hud?.hudBanner("PLAYER \(id + 1) JOINED", color: Palette.rivalColor(id))
+                rosterChanged = true
+            case .peerState(let id, let row, let x, let score, let alive):
+                guard let peer = peers[id] else { break }
+                peer.score = max(peer.score, score)
+                peer.alive = alive
+                updateGhost(peer, id: id, row: row, x: x, alive: alive)
+                rosterChanged = true
+            case .peerGarbage(let id, let amount):
+                guard state == .playing else { break }
+                hazardBoostTimer += K.garbageBoostSeconds * Float(amount)
+                hud?.hudBanner("PLAYER \(id + 1) SENT TRAFFIC!", color: Palette.rivalColor(id))
+            case .peerGameOver(let id, let score):
+                guard let peer = peers[id] else { break }
+                peer.score = max(peer.score, score)
+                peer.alive = false
+                updateGhost(peer, id: id, row: nil, x: nil, alive: false)
+                rosterChanged = true
+                checkLastOtterStanding()
+            case .opponentLeft(let id):
+                peers[id]?.ghost?.removeFromParentNode()
+                peers.removeValue(forKey: id)
+                hud?.hudBanner("PLAYER \(id + 1) LEFT", color: Palette.rivalColor(id))
+                rosterChanged = true
+                checkLastOtterStanding()
+            case .disconnected:
+                for (_, peer) in peers { peer.ghost?.removeFromParentNode() }
+                peers.removeAll()
+                rosterChanged = true
+            }
+        }
+        if rosterChanged { pushRivalHUD() }
+
+        // periodic state while riding logs (position changes without landing)
+        if state == .playing, ridingLog != nil {
+            stateSendTimer -= dt
+            if stateSendTimer <= 0 {
+                stateSendTimer = 0.15
+                sendStateIfChanged()
+            }
+        }
+    }
+
+    private func addPeer(_ id: Int) {
+        guard peers[id] == nil else { return }
+        peers[id] = Peer()
+    }
+
+    private func pushRivalHUD() {
+        let rivals = peers.keys.sorted().map {
+            RivalStatus(id: $0, score: peers[$0]!.score, alive: peers[$0]!.alive)
+        }
+        hud?.hudSetRivals(rivals)
+    }
+
+    private func sendStateIfChanged() {
+        guard mp.isConnected else { return }
+        if let last = lastSentState, last.row == playerRow, abs(last.x - playerX) < 0.05 { return }
+        lastSentState = (playerRow, playerX)
+        mp.sendState(row: playerRow, x: playerX, score: score, alive: state == .playing || state == .title)
+    }
+
+    private func updateGhost(_ peer: Peer, id: Int, row: Int?, x: Float?, alive: Bool) {
+        if !alive {
+            if let ghost = peer.ghost {
+                peer.ghost = nil
+                ghost.runAction(.sequence([
+                    .group([.scale(to: 0.05, duration: 0.3), .fadeOut(duration: 0.3)]),
+                    .removeFromParentNode(),
+                ]))
+            }
+            return
+        }
+        guard let row, let x else { return }
+        let ghost: SCNNode
+        if let existing = peer.ghost {
+            ghost = existing
+        } else {
+            ghost = VoxelFactory.wiskers()
+            ghost.opacity = 0.55
+            ghost.castsShadow = false
+            let marker = VoxelFactory.box(w: 0.28, h: 0.14, l: 0.28,
+                                          color: Palette.rivalColor(id), y: 1.15, chamfer: 0.02)
+            marker.castsShadow = false
+            ghost.addChildNode(marker)
+            worldNode.addChildNode(ghost)
+            peer.ghost = ghost
+        }
+        let y = terrain.rows[row]?.surfaceY ?? 0
+        let move = SCNAction.move(to: SCNVector3(x, y, Float(row)), duration: 0.12)
+        move.timingMode = .easeOut
+        ghost.runAction(move)
+    }
+
+    private func checkLastOtterStanding() {
+        guard !announcedWin, state == .playing, !peers.isEmpty else { return }
+        guard peers.values.allSatisfy({ !$0.alive }) else { return }
+        announcedWin = true
+        hud?.hudBanner("LAST OTTER STANDING — YOU WIN!", color: Palette.accentGold)
     }
 
     // MARK: - Autopilot (debug)
