@@ -21,6 +21,8 @@ targets:
         UIStatusBarHidden: true
         UIViewControllerBasedStatusBarAppearance: false
         UIRequiresFullScreen: true
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
     settings:
       base:
         TARGETED_DEVICE_FAMILY: "1,2"

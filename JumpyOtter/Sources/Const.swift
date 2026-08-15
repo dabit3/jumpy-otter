@@ -24,6 +24,10 @@ enum K {
     static let trainPlayerHalfWidth: Float = 0.12
     static let trainCollisionInset: Float = 0.22
     static let trainRowHalfDepth: Float = 0.30
+
+    // multiplayer garbage: road traffic speed surge on rivals
+    static let garbageSpeedBoost: Float = 1.7
+    static let garbageBoostSeconds: Float = 4.0
 }
 
 enum Palette {
@@ -69,6 +73,15 @@ enum Palette {
     static let trainBody  = UIColor(red: 0.75, green: 0.22, blue: 0.20, alpha: 1)
     static let trainCar   = UIColor(red: 0.45, green: 0.48, blue: 0.55, alpha: 1)
     static let eagleBrown = UIColor(red: 0.42, green: 0.29, blue: 0.18, alpha: 1)
+    static let rivalColors: [UIColor] = [
+        UIColor(red: 1.00, green: 0.65, blue: 0.27, alpha: 1),  // P1 orange
+        UIColor(red: 0.35, green: 0.55, blue: 0.90, alpha: 1),  // P2 blue
+        UIColor(red: 0.60, green: 0.40, blue: 0.85, alpha: 1),  // P3 purple
+        UIColor(red: 0.28, green: 0.75, blue: 0.60, alpha: 1),  // P4 teal
+    ]
+    static func rivalColor(_ id: Int) -> UIColor {
+        rivalColors[((id % rivalColors.count) + rivalColors.count) % rivalColors.count]
+    }
     static let carColors: [UIColor] = [
         UIColor(red: 0.90, green: 0.30, blue: 0.25, alpha: 1),
         UIColor(red: 0.98, green: 0.65, blue: 0.15, alpha: 1),
