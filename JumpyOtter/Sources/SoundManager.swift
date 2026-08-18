@@ -27,12 +27,15 @@ final class SoundManager {
     }
 
     func play(_ name: String, volume: Float = 1.0) {
+        guard AppSettings.shared.soundEnabled else { return }
+        let master = AppSettings.shared.volume
+        guard master > 0 else { return }
         queue.async { [self] in
             guard let pool = pools[name], !pool.isEmpty else { return }
             let i = (cursors[name] ?? 0) % pool.count
             cursors[name] = i + 1
             let p = pool[i]
-            p.volume = volume
+            p.volume = volume * master
             p.currentTime = 0
             p.play()
         }

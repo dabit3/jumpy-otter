@@ -19,6 +19,9 @@ final class GameViewController: UIViewController, GameHUD {
     private let logoLabel = UILabel()
     private let tapLabel = UILabel()
 
+    // Menu
+    private let menuButton = UIButton(type: .system)
+
     // Game over overlay
     private let gameOverPanel = UIView()
     private let gameOverTitle = UILabel()
@@ -141,6 +144,22 @@ final class GameViewController: UIViewController, GameHUD {
             rivalStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
         ])
 
+        menuButton.setTitle("☰", for: .normal)
+        menuButton.titleLabel?.font = .systemFont(ofSize: 30, weight: .heavy)
+        menuButton.setTitleColor(.white, for: .normal)
+        menuButton.backgroundColor = UIColor(white: 0, alpha: 0.35)
+        menuButton.layer.cornerRadius = 12
+        menuButton.accessibilityIdentifier = "menuButton"
+        menuButton.addTarget(self, action: #selector(onMenu), for: .touchUpInside)
+        menuButton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(menuButton)
+        NSLayoutConstraint.activate([
+            menuButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12),
+            menuButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            menuButton.widthAnchor.constraint(equalToConstant: 48),
+            menuButton.heightAnchor.constraint(equalToConstant: 48),
+        ])
+
         // event banner (joins, attacks, win)
         bannerLabel.textAlignment = .center
         styleOutlined(bannerLabel, size: 24)
@@ -222,13 +241,22 @@ final class GameViewController: UIViewController, GameHUD {
 
     private func setupGestures() {
         let tap = UITapGestureRecognizer(target: self, action: #selector(onTap))
+        tap.delegate = self
         view.addGestureRecognizer(tap)
         for swipeDir: UISwipeGestureRecognizer.Direction in [.up, .down, .left, .right] {
             let swipe = UISwipeGestureRecognizer(target: self, action: #selector(onSwipe(_:)))
             swipe.direction = swipeDir
+            swipe.delegate = self
             view.addGestureRecognizer(swipe)
             tap.require(toFail: swipe)
         }
+    }
+
+    @objc private func onMenu() {
+        let menu = MenuViewController()
+        menu.modalPresentationStyle = .overFullScreen
+        menu.modalTransitionStyle = .crossDissolve
+        present(menu, animated: true)
     }
 
     @objc private func onTap() {
@@ -271,6 +299,7 @@ final class GameViewController: UIViewController, GameHUD {
         DispatchQueue.main.async {
             self.gameOverPanel.isHidden = true
             self.scoreLabel.text = "0"
+            self.menuButton.isHidden = true
             UIView.animate(withDuration: 0.25) {
                 self.titleStack.alpha = 0
             } completion: { _ in
@@ -283,6 +312,7 @@ final class GameViewController: UIViewController, GameHUD {
         DispatchQueue.main.async {
             self.gameOverPanel.isHidden = true
             self.scoreLabel.text = "0"
+            self.menuButton.isHidden = false
             self.titleStack.isHidden = false
             UIView.animate(withDuration: 0.25) {
                 self.titleStack.alpha = 1
@@ -296,6 +326,7 @@ final class GameViewController: UIViewController, GameHUD {
             self.bestLabel.text = "TOP  \(best)"
             self.gameOverPanel.alpha = 0
             self.gameOverPanel.isHidden = false
+            self.menuButton.isHidden = false
             self.canRetry = false
             UIView.animate(withDuration: 0.3) {
                 self.gameOverPanel.alpha = 1
@@ -349,3 +380,10 @@ final class GameViewController: UIViewController, GameHUD {
         }
     }
 }
+
+extension GameViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        !(touch.view is UIControl)
+    }
+}
+
