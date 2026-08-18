@@ -144,9 +144,12 @@ final class GameViewController: UIViewController, GameHUD {
             rivalStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
         ])
 
-        menuButton.setTitle("☰", for: .normal)
-        menuButton.titleLabel?.font = .systemFont(ofSize: 30, weight: .heavy)
-        menuButton.setTitleColor(.white, for: .normal)
+        let menuIcon = UIImage(
+            systemName: "line.3.horizontal",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 20, weight: .heavy)
+        )
+        menuButton.setImage(menuIcon, for: .normal)
+        menuButton.tintColor = .white
         menuButton.backgroundColor = UIColor(white: 0, alpha: 0.35)
         menuButton.layer.cornerRadius = 12
         menuButton.accessibilityIdentifier = "menuButton"
