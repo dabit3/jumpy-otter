@@ -55,6 +55,8 @@ final class MenuViewController: UIViewController {
         ])
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(onBackgroundTap(_:)))
+        tap.cancelsTouchesInView = false
+        tap.delegate = self
         view.addGestureRecognizer(tap)
 
         show(.root)
@@ -290,6 +292,13 @@ final class MenuViewController: UIViewController {
 
     @objc private func onUsernameChange(_ field: UITextField) {
         AppSettings.shared.username = field.text ?? ""
+    }
+}
+
+extension MenuViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        // Only handle taps on the dimmed background, never inside the card.
+        touch.view?.isDescendant(of: card) != true
     }
 }
 
