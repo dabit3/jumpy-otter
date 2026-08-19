@@ -10,19 +10,24 @@ final class SoundManager {
     private let queue = DispatchQueue(label: "sound")
 
     private init() {
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
-        try? AVAudioSession.sharedInstance().setActive(true)
-        for name in ["hop", "bump", "coin", "splash", "hit", "train", "eagle", "bell"] {
-            guard let url = Bundle.main.url(forResource: name, withExtension: "wav") else { continue }
-            var pool: [AVAudioPlayer] = []
-            for _ in 0..<3 {
-                if let p = try? AVAudioPlayer(contentsOf: url) {
-                    p.prepareToPlay()
-                    pool.append(p)
+        // Audio session setup and player priming can block indefinitely on a
+        // stalled audio backend, so it all happens on the sound queue: the
+        // first caller never blocks its own thread (main or render).
+        queue.async { [self] in
+            try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
+            try? AVAudioSession.sharedInstance().setActive(true)
+            for name in ["hop", "bump", "coin", "splash", "hit", "train", "eagle", "bell"] {
+                guard let url = Bundle.main.url(forResource: name, withExtension: "wav") else { continue }
+                var pool: [AVAudioPlayer] = []
+                for _ in 0..<3 {
+                    if let p = try? AVAudioPlayer(contentsOf: url) {
+                        p.prepareToPlay()
+                        pool.append(p)
+                    }
                 }
+                pools[name] = pool
+                cursors[name] = 0
             }
-            pools[name] = pool
-            cursors[name] = 0
         }
     }
 

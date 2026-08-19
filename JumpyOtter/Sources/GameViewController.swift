@@ -294,6 +294,8 @@ final class GameViewController: UIViewController, GameHUD {
         DispatchQueue.main.async {
             self.finalScoreLabel.text = "SCORE  \(score)"
             self.bestLabel.text = "TOP  \(best)"
+            self.titleStack.layer.removeAllAnimations()
+            self.titleStack.isHidden = true
             self.gameOverPanel.alpha = 0
             self.gameOverPanel.isHidden = false
             self.canRetry = false
