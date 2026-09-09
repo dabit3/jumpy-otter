@@ -45,7 +45,6 @@ class MainActivity : Activity(), GameHUD {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        hideSystemBars()
 
         sound = SoundManager(this)
         val autopilot = intent.getBooleanExtra("AUTOPILOT", false)
@@ -69,6 +68,12 @@ class MainActivity : Activity(), GameHUD {
         setupOverlays(root)
         setContentView(root)
         setupGestures(root)
+        hideSystemBars()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemBars()
     }
 
     private fun hideSystemBars() {
