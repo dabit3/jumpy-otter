@@ -240,14 +240,19 @@ class MainActivity : Activity(), GameHUD {
         runOnUiThread {
             gameOverPanel.visibility = View.GONE
             scoreLabel.text = "0"
-            titleStack.animate().alpha(0f).setDuration(250).withEndAction { titleStack.visibility = View.GONE }.start()
+            titleStack.animate().cancel()
+            titleStack.animate().alpha(0f).setDuration(250).withEndAction {
+                if (game.state != GameController.State.TITLE) titleStack.visibility = View.GONE
+            }.start()
         }
     }
 
     override fun hudShowTitle() {
         runOnUiThread {
+            if (game.state != GameController.State.TITLE) return@runOnUiThread
             gameOverPanel.visibility = View.GONE
             scoreLabel.text = "0"
+            titleStack.animate().cancel()
             titleStack.visibility = View.VISIBLE
             titleStack.animate().alpha(1f).setDuration(250).start()
         }
@@ -257,6 +262,8 @@ class MainActivity : Activity(), GameHUD {
         runOnUiThread {
             finalScoreLabel.text = "SCORE  $score"
             bestLabel.text = "TOP  $best"
+            titleStack.animate().cancel()
+            titleStack.visibility = View.GONE
             gameOverPanel.alpha = 0f
             gameOverPanel.visibility = View.VISIBLE
             canRetry = false
