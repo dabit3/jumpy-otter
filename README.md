@@ -58,6 +58,9 @@ Create the AVD once with
 If the emulator refuses to start because Hypervisor.framework is unavailable
 (nested virtualisation, some CI Macs), add `-accel off -gpu swiftshader_indirect`;
 it boots in software emulation, just slowly.
+On AOSP ATD images (`aosp_atd`) native views are hidden by default; run
+`adb shell setprop debug.hwui.drawing_enabled true` before launching or the
+title/score/game-over text will not appear over the GL scene.
 
 Autopilot for unattended runs:
 `adb shell am start -n com.devin.jumpyotter/.MainActivity --ez AUTOPILOT true`
