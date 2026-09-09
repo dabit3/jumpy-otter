@@ -89,9 +89,9 @@ class MultiplayerClient(private val url: String = DEFAULT_URL) {
             "welcome" -> {
                 playerID = obj.optInt("id", -1)
                 connected = true
-                events.add(MultiplayerEvent.Connected(playerID, intList(obj.optJSONArray("peers"))))
+                events.add(MultiplayerEvent.Connected(playerID, intList(obj.optJSONArray("players"))))
             }
-            "peerJoined" -> events.add(MultiplayerEvent.PeerJoined(obj.optInt("id")))
+            "playerJoined" -> events.add(MultiplayerEvent.PeerJoined(obj.optInt("id")))
             "state" -> events.add(
                 MultiplayerEvent.PeerState(
                     obj.optInt("id"), obj.optInt("row"), obj.optDouble("x", 0.0).toFloat(),
