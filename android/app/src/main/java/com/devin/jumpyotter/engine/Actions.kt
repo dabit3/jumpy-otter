@@ -118,6 +118,14 @@ class FadeOut(duration: Float) : IntervalAction(duration) {
     }
 }
 
+class FadeTo(val target: Float, duration: Float) : IntervalAction(duration) {
+    private var start = 1f
+    override fun begin(node: Node) { start = node.opacity }
+    override fun apply(node: Node, prev: Float, cur: Float) {
+        node.opacity = start + (target - start) * cur
+    }
+}
+
 class Wait(duration: Float) : IntervalAction(duration) {
     override fun begin(node: Node) {}
     override fun apply(node: Node, prev: Float, cur: Float) {}

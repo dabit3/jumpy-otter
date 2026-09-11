@@ -21,11 +21,13 @@ import kotlin.math.roundToInt
 interface GameHUD {
     fun hudSetScore(score: Int)
     fun hudSetCreatine(creatine: Int)
-    fun hudGameOver(score: Int, best: Int, creatine: Int)
+    fun hudGameOver(score: Int, best: Int, creatine: Int, newBest: Boolean)
     fun hudStarted()
-    fun hudShowTitle()
+    fun hudShowTitle(best: Int)
     fun hudSetRivals(rivals: List<RivalStatus>)
     fun hudBanner(text: String, color: Rgb)
+    /** Full-screen colour flash (deaths, records); alpha in 0..1. */
+    fun hudFlash(color: Rgb, alpha: Float)
 }
 
 data class RivalStatus(val id: Int, val score: Int, val alive: Boolean)
@@ -58,6 +60,7 @@ class GameController(
 
     // player
     private var playerNode = Node()
+    private val playerShadow = VoxelFactory.box(0.66f, 0.02f, 0.66f, Palette.shadow).also { it.opacity = 0.28f }
     private var playerRow = 0
     private var playerX = 0f
     private var isHopping = false
@@ -99,6 +102,7 @@ class GameController(
     private var lastSentRow = Int.MIN_VALUE
     private var lastSentX = 0f
     private var announcedWin = false
+    private var announcedRecord = false
 
     // GL resources scheduled for deletion (nodes removed from the graph)
     private val garbageNodes = ArrayList<Node>()
@@ -109,6 +113,7 @@ class GameController(
         renderer.root.addChild(cameraRig)
         terrain = TerrainGenerator(worldNode) { row -> garbageNodes.add(row.node) }
         setupCamera()
+        worldNode.addChild(playerShadow)
         startFresh()
         mp.connect()
     }
@@ -148,6 +153,8 @@ class GameController(
         synchronized(inputLock) { inputQueue.clear() }
 
         announcedWin = false
+        announcedRecord = false
+        playerShadow.hidden = false
         lastSentRow = Int.MIN_VALUE
         mp.sendState(0, 0f, 0, true)
 
@@ -195,7 +202,7 @@ class GameController(
         if (!shouldRestart) return
         state = State.TITLE
         startFresh()
-        hud?.hudShowTitle()
+        hud?.hudShowTitle(best)
     }
 
     private fun enqueue(dir: Dir) {
@@ -235,6 +242,7 @@ class GameController(
 
         renderer.root.updateActions(dt)
         runDelayed(dt)
+        updatePlayerShadow()
 
         renderer.target.set(cameraRig.position)
         renderer.eye.set(cameraRig.position.x - 6.5f, cameraRig.position.y + 10.5f, cameraRig.position.z - 7.0f)
@@ -242,6 +250,18 @@ class GameController(
 
         for (n in garbageNodes) n.disposeMeshes(renderer.contextGen)
         garbageNodes.clear()
+    }
+
+    /** Soft contact shadow under the otter (the GLES2 renderer has no shadow maps). */
+    private fun updatePlayerShadow() {
+        if (playerNode.parent !== worldNode) { playerShadow.hidden = true; return }
+        val p = playerNode.position
+        val surface = terrain.rows[p.z.roundToInt()]?.surfaceY ?: 0f
+        val height = (p.y - surface).coerceAtLeast(0f)
+        val s = (1f - height * 0.9f).coerceIn(0.45f, 1f)
+        playerShadow.position.set(p.x, surface + 0.012f, p.z)
+        playerShadow.scale.set(s, 1f, s)
+        playerShadow.opacity = 0.28f * s * playerNode.opacity
     }
 
     private fun after(seconds: Float, block: () -> Unit) {
@@ -396,6 +416,19 @@ class GameController(
         if (rowIndex > score) {
             score = rowIndex
             hud?.hudSetScore(score)
+            if (score % K.milestoneEvery == 0) hud?.hudBanner("$score ROWS!", Palette.accentGold)
+            if (score > best && !announcedRecord && best > 0) {
+                announcedRecord = true
+                hud?.hudBanner("NEW RECORD!", Palette.accentGold)
+                hud?.hudFlash(Palette.accentGold, 0.35f)
+            }
+        }
+
+        // landing feedback
+        if (row.kind == RowKind.RIVER) {
+            spawnBurst(x, 0.15f, rowIndex.toFloat(), Palette.waterFoam, 4, 0.05f, 0.09f, 0.6f)
+        } else {
+            spawnBurst(x, 0.05f, rowIndex.toFloat(), Palette.hudCream, 4, 0.05f, 0.09f, 0.6f)
         }
 
         val col = x.roundToInt()
@@ -413,6 +446,7 @@ class GameController(
                     RemoveFromParent(),
                 )
             )
+            spawnBurst(x, 0.6f, rowIndex.toFloat(), Palette.accentGold, 10, 0.05f, 0.11f, 1.0f)
             hud?.hudSetCreatine(totalCreatine)
         }
 
@@ -542,6 +576,7 @@ class GameController(
         playerNode.position.y = terrain.rows[pz.roundToInt()]?.surfaceY ?: 0f
         spawnBurst(px, 0.4f, pz, Palette.otter, 14)
         shakeCamera()
+        hud?.hudFlash(Palette.dangerRed, 0.45f)
         after(0.8f) { finishGameOver() }
     }
 
@@ -550,7 +585,8 @@ class GameController(
         state = State.DYING
         sound.play(Sfx.SPLASH, 1.0f)
         isHopping = false
-        spawnBurst(playerX, 0.2f, playerRow.toFloat(), Palette.water, 16)
+        spawnBurst(playerX, 0.2f, playerRow.toFloat(), Palette.waterFoam, 16)
+        hud?.hudFlash(Palette.water, 0.4f)
         val sink = Group(
             MoveBy(0f, -1.2f, 0f, 0.45f).also { it.timing = Timing.EASE_IN },
             FadeOut(0.45f).also { it.timing = Timing.EASE_IN },
@@ -567,11 +603,12 @@ class GameController(
     private fun finishGameOver() {
         if (state != State.DYING) return
         state = State.GAME_OVER
-        if (score > best) {
+        val newBest = score > best
+        if (newBest) {
             best = score
             prefs.edit().putInt("best", best).apply()
         }
-        hud?.hudGameOver(score, best, totalCreatine)
+        hud?.hudGameOver(score, best, totalCreatine, newBest)
         mp.sendGameOver(score)
         mp.sendState(playerRow, playerX, score, false)
     }
@@ -734,14 +771,17 @@ class GameController(
 
     // MARK: - Effects
 
-    private fun spawnBurst(x: Float, y: Float, z: Float, color: Rgb, count: Int) {
+    private fun spawnBurst(
+        x: Float, y: Float, z: Float, color: Rgb, count: Int,
+        minSize: Float = 0.06f, maxSize: Float = 0.14f, spread: Float = 1.2f,
+    ) {
         for (i in 0 until count) {
-            val s = rand(0.06f, 0.14f)
+            val s = rand(minSize, maxSize)
             val piece = VoxelFactory.box(s, s, s, color)
             piece.position.set(x, y, z)
             worldNode.addChild(piece)
-            val vx = rand(-1.2f, 1.2f)
-            val vz = rand(-1.2f, 1.2f)
+            val vx = rand(-spread, spread)
+            val vz = rand(-spread, spread)
             val up = MoveBy(vx * 0.4f, rand(0.5f, 1.1f), vz * 0.4f, 0.18f).also { it.timing = Timing.EASE_OUT }
             val down = MoveBy(vx * 0.6f, -rand(0.7f, 1.3f), vz * 0.6f, 0.3f).also { it.timing = Timing.EASE_IN }
             piece.runAction(Sequence(up, down, FadeOut(0.12f), Run { garbageNodes.add(piece) }, RemoveFromParent()))

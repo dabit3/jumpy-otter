@@ -1,7 +1,11 @@
 package com.devin.jumpyotter
 
+import com.devin.jumpyotter.engine.FadeTo
 import com.devin.jumpyotter.engine.MeshBuilder
+import com.devin.jumpyotter.engine.MoveBy
 import com.devin.jumpyotter.engine.Node
+import com.devin.jumpyotter.engine.RepeatForever
+import com.devin.jumpyotter.engine.Sequence
 import kotlin.math.PI
 
 enum class RowKind { GRASS, ROAD, RIVER, RAIL }
@@ -172,6 +176,17 @@ class TerrainGenerator(private val parent: Node, private val onRowRemoved: (Row)
             }
         }
 
+        // wildflowers and grass tufts inside the playable strip
+        for (col in K.minCol..K.maxCol) {
+            if (rand01() >= 0.28f) continue
+            val ox = col + rand(-0.32f, 0.32f)
+            val oz = rand(-0.32f, 0.32f)
+            mb.withOffset(ox, 0f, oz, 1f, rand(0f, PI.toFloat())) {
+                if (rand01() < 0.55f) VoxelFactory.flowerInto(this, Palette.flowerColors.random())
+                else VoxelFactory.grassTuftInto(this)
+            }
+        }
+
         // trees inside the playable strip
         if (row.index == 0) return  // keep spawn row clear
         var cols = (K.minCol..K.maxCol).shuffled()
@@ -252,6 +267,25 @@ class TerrainGenerator(private val parent: Node, private val onRowRemoved: (Row)
         // river bed and water surface
         mb.box(K.visualHalfWidth * 2, 0.3f, 1.0f, Palette.riverBed, 0f, -0.45f, 0f)
         mb.box(K.visualHalfWidth * 2, 0.16f, 1.0f, Palette.water, 0f, -0.18f, 0f)
+        // foam streaks drifting with the current
+        var fx = -K.visualHalfWidth + rand(0.2f, 1.4f)
+        while (fx < K.visualHalfWidth - 0.6f) {
+            val foam = VoxelFactory.box(rand(0.35f, 0.9f), 0.02f, 0.06f, Palette.waterFoam, fx, -0.095f, rand(-0.4f, 0.4f))
+            foam.opacity = 0.75f
+            val drift = rand(0.8f, 1.6f)
+            foam.runAction(
+                RepeatForever(
+                    Sequence(
+                        MoveBy(drift, 0f, 0f, rand(1.6f, 2.8f)),
+                        FadeTo(0f, 0.3f),
+                        MoveBy(-drift, 0f, 0f, 0f),
+                        FadeTo(0.75f, 0.3f),
+                    )
+                )
+            )
+            row.node.addChild(foam)
+            fx += rand(1.8f, 3.6f)
+        }
 
         // alternate direction within river groups
         lastRiverDir = -lastRiverDir

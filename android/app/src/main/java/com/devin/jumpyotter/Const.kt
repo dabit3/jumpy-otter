@@ -30,6 +30,28 @@ object K {
     // multiplayer garbage: road traffic speed surge on rivals
     const val garbageSpeedBoost = 1.7f
     const val garbageBoostSeconds = 4.0f
+
+    // arcade milestone banner cadence (rows)
+    const val milestoneEvery = 25
+}
+
+/** Arcade rank awarded on the game-over card. */
+object Rank {
+    fun title(score: Int): String = when {
+        score < 10 -> "ROOKIE"
+        score < 25 -> "HOPPER"
+        score < 50 -> "PRO"
+        score < 100 -> "LEGEND"
+        else -> "OTTERLORD"
+    }
+
+    fun color(score: Int): Rgb = when {
+        score < 10 -> Palette.hudSilver
+        score < 25 -> Palette.leaf
+        score < 50 -> Palette.window
+        score < 100 -> Palette.accentGold
+        else -> Palette.hotOrange
+    }
 }
 
 class Rgb(val r: Float, val g: Float, val b: Float) {
@@ -44,12 +66,28 @@ class Rgb(val r: Float, val g: Float, val b: Float) {
 }
 
 object Palette {
-    val grassLight = Rgb(0.46f, 0.72f, 0.38f)
-    val grassDark = Rgb(0.40f, 0.66f, 0.34f)
-    val grassSide = Rgb(0.31f, 0.52f, 0.30f)
-    val road = Rgb(0.25f, 0.27f, 0.30f)
-    val water = Rgb(0.24f, 0.58f, 0.72f)
-    val riverBed = Rgb(0.16f, 0.40f, 0.52f)
+    val grassLight = Rgb(0.52f, 0.80f, 0.38f)
+    val grassDark = Rgb(0.45f, 0.73f, 0.33f)
+    val grassSide = Rgb(0.30f, 0.52f, 0.27f)
+    val grassTuft = Rgb(0.36f, 0.66f, 0.28f)
+    val road = Rgb(0.22f, 0.23f, 0.28f)
+    val water = Rgb(0.20f, 0.62f, 0.86f)
+    val riverBed = Rgb(0.12f, 0.38f, 0.58f)
+    val waterFoam = Rgb(0.80f, 0.93f, 0.99f)
+    val flowerColors = listOf(
+        Rgb(0.98f, 0.45f, 0.62f),
+        Rgb(1.00f, 0.86f, 0.25f),
+        Rgb(0.98f, 0.98f, 0.98f),
+        Rgb(0.60f, 0.55f, 0.95f),
+    )
+    // HUD / arcade chrome
+    val hudNavy = Rgb(0.07f, 0.09f, 0.20f)
+    val hudInk = Rgb(0.10f, 0.07f, 0.16f)
+    val hudCream = Rgb(1.00f, 0.96f, 0.86f)
+    val hudSilver = Rgb(0.80f, 0.84f, 0.90f)
+    val hotOrange = Rgb(1.00f, 0.45f, 0.15f)
+    val dangerRed = Rgb(0.95f, 0.20f, 0.22f)
+    val shadow = Rgb(0.08f, 0.14f, 0.10f)
     val sidewalk = Rgb(0.72f, 0.70f, 0.66f)
     val curb = Rgb(0.88f, 0.86f, 0.80f)
     val railBed = Rgb(0.48f, 0.46f, 0.42f)
@@ -68,7 +106,7 @@ object Palette {
     val beakOrange = Rgb(0.95f, 0.58f, 0.13f)
     val black = Rgb(0.13f, 0.13f, 0.16f)
     val accentGold = Rgb(1.00f, 0.84f, 0.20f)
-    val sky = Rgb(0.66f, 0.80f, 0.84f)
+    val sky = Rgb(0.53f, 0.78f, 0.95f)
     val wheel = Rgb(0.15f, 0.15f, 0.18f)
     val window = Rgb(0.55f, 0.80f, 0.95f)
     val cableRed = Rgb(0.72f, 0.13f, 0.12f)

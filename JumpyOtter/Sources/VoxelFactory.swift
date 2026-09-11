@@ -71,6 +71,26 @@ enum VoxelFactory {
         return flat
     }
 
+    // MARK: - Ground decoration
+
+    static func flower(color: UIColor) -> SCNNode {
+        let root = SCNNode()
+        root.addChildNode(box(w: 0.05, h: 0.22, l: 0.05, color: Palette.leafDark, y: 0.11, chamfer: 0))
+        root.addChildNode(box(w: 0.16, h: 0.07, l: 0.16, color: color, y: 0.25, chamfer: 0.02))
+        root.addChildNode(box(w: 0.07, h: 0.075, l: 0.07, color: Palette.accentGold, y: 0.26, chamfer: 0))
+        root.castsShadow = false
+        return root
+    }
+
+    static func grassTuft() -> SCNNode {
+        let root = SCNNode()
+        for (dx, dz, h) in [(-0.07, 0.03, 0.16), (0.06, -0.05, 0.22), (0.0, 0.07, 0.13)] as [(Float, Float, CGFloat)] {
+            root.addChildNode(box(w: 0.06, h: h, l: 0.06, color: Palette.grassTuft, x: dx, y: Float(h / 2), z: dz, chamfer: 0))
+        }
+        root.castsShadow = false
+        return root
+    }
+
     // MARK: - Trees
 
     static func tree(height: Int) -> SCNNode {
@@ -278,8 +298,23 @@ enum VoxelFactory {
         root.addChildNode(box(w: 0.13, h: 0.025, l: 0.015, color: Palette.white, x: -0.015, y: 0.30, z: 0.173, chamfer: 0.005))
         root.addChildNode(box(w: 0.13, h: 0.025, l: 0.015, color: Palette.white, x: -0.015, y: 0.18, z: 0.173, chamfer: 0.005))
         root.addChildNode(box(w: 0.025, h: 0.14, l: 0.015, color: Palette.white, x: -0.068, y: 0.24, z: 0.173, chamfer: 0.005))
+        // glowing pickup pad so collectibles read from across the screen
+        let pad = box(w: 0.62, h: 0.03, l: 0.62, color: Palette.accentGold, y: -0.165, chamfer: 0.01)
+        pad.geometry?.firstMaterial?.emission.contents = Palette.accentGold
+        pad.opacity = 0.55
+        pad.castsShadow = false
+        pad.runAction(.repeatForever(.sequence([
+            .group([.scale(to: 1.25, duration: 0.7), .fadeOpacity(to: 0.15, duration: 0.7)]),
+            .group([.scale(to: 1.0, duration: 0.7), .fadeOpacity(to: 0.55, duration: 0.7)]),
+        ])))
+        root.addChildNode(pad)
         root.position.y = 0.18
         root.runAction(.repeatForever(.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 1.8)))
+        let bobUp = SCNAction.moveBy(x: 0, y: 0.12, z: 0, duration: 0.6)
+        bobUp.timingMode = .easeInEaseOut
+        let bobDown = SCNAction.moveBy(x: 0, y: -0.12, z: 0, duration: 0.6)
+        bobDown.timingMode = .easeInEaseOut
+        root.runAction(.repeatForever(.sequence([bobUp, bobDown])))
         return root
     }
 

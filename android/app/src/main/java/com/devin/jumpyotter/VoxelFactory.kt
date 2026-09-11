@@ -1,11 +1,16 @@
 package com.devin.jumpyotter
 
+import com.devin.jumpyotter.engine.FadeTo
+import com.devin.jumpyotter.engine.Group
 import com.devin.jumpyotter.engine.MeshBuilder
+import com.devin.jumpyotter.engine.MoveBy
 import com.devin.jumpyotter.engine.Node
 import com.devin.jumpyotter.engine.RepeatForever
 import com.devin.jumpyotter.engine.RotateBy
 import com.devin.jumpyotter.engine.RotateTo
+import com.devin.jumpyotter.engine.ScaleTo
 import com.devin.jumpyotter.engine.Sequence
+import com.devin.jumpyotter.engine.Timing
 import kotlin.math.PI
 
 class Model(val node: Node, val halfLen: Float)
@@ -234,9 +239,44 @@ object VoxelFactory {
             box(0.025f, 0.14f, 0.015f, Palette.white, -0.068f, 0.24f, 0.173f)
         }
         root.name = "creatineBottle"
+        // glowing pickup pad so collectibles read from across the screen
+        val pad = box(0.62f, 0.03f, 0.62f, Palette.accentGold, 0f, -0.165f, 0f)
+        pad.emissive = floatArrayOf(0.35f, 0.28f, 0.05f)
+        pad.opacity = 0.55f
+        pad.runAction(
+            RepeatForever(
+                Sequence(
+                    Group(ScaleTo(1.25f, 0.7f), FadeTo(0.15f, 0.7f)),
+                    Group(ScaleTo(1.0f, 0.7f), FadeTo(0.55f, 0.7f)),
+                )
+            )
+        )
+        root.addChild(pad)
         root.position.y = 0.18f
         root.runAction(RepeatForever(RotateBy(PI.toFloat() * 2, 1.8f)))
+        root.runAction(
+            RepeatForever(
+                Sequence(
+                    MoveBy(0f, 0.12f, 0f, 0.6f).also { it.timing = Timing.EASE_IN_OUT },
+                    MoveBy(0f, -0.12f, 0f, 0.6f).also { it.timing = Timing.EASE_IN_OUT },
+                )
+            )
+        )
         return root
+    }
+
+    // MARK: - Ground decoration (merged into the row mesh)
+
+    fun flowerInto(mb: MeshBuilder, color: Rgb) = with(mb) {
+        box(0.05f, 0.22f, 0.05f, Palette.leafDark, 0f, 0.11f, 0f)
+        box(0.16f, 0.07f, 0.16f, color, 0f, 0.25f, 0f)
+        box(0.07f, 0.075f, 0.07f, Palette.accentGold, 0f, 0.26f, 0f)
+    }
+
+    fun grassTuftInto(mb: MeshBuilder) = with(mb) {
+        box(0.06f, 0.16f, 0.06f, Palette.grassTuft, -0.07f, 0.08f, 0.03f)
+        box(0.06f, 0.22f, 0.06f, Palette.grassTuft, 0.06f, 0.11f, -0.05f)
+        box(0.06f, 0.13f, 0.06f, Palette.grassTuft, 0f, 0.065f, 0.07f)
     }
 
     // MARK: - Eagle
