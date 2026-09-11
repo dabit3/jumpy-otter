@@ -103,7 +103,6 @@ class MainActivity : Activity(), GameHUD {
         val relay = intent.getStringExtra("RELAY_URL") ?: MultiplayerClient.DEFAULT_URL
         val prefs = getSharedPreferences("jumpyotter", MODE_PRIVATE)
         game = GameController(prefs, sound, autopilot, relay)
-        game.hud = this
 
         val root = FrameLayout(this)
         glView = GLSurfaceView(this).apply {
@@ -123,6 +122,7 @@ class MainActivity : Activity(), GameHUD {
         setContentView(root)
         setupGestures(root)
         hideSystemBars()
+        game.hud = this
         showTitle(prefs.getInt("best", 0))
     }
 
@@ -286,8 +286,8 @@ class MainActivity : Activity(), GameHUD {
         }
         hiScoreLabel = arcade(20f, Palette.accentGold, "HI-SCORE  0", outlineDp = 3f, letterSpacing = 0.1f)
         val tap = arcade(24f, Palette.hudCream, "TAP TO HOP", outlineDp = 3f, letterSpacing = 0.12f)
-        val steer = caption("SWIPE TO STEER", Palette.hudSilver).apply { textSize = 13f }
-        val credits = caption("1UP  ·  CREDITS 99  ·  PRESS TO START", Palette.hudSilver)
+        val steer = arcade(14f, Palette.hudCream, "SWIPE TO STEER", outlineDp = 2.5f, letterSpacing = 0.2f)
+        val credits = arcade(12f, Palette.hudCream, "1UP  ·  CREDITS 99  ·  PRESS TO START", outlineDp = 2.5f, letterSpacing = 0.18f)
 
         titleOverlay.addView(ribbon, wrap())
         titleOverlay.addView(logoTop, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(6f) })

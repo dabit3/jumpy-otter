@@ -46,6 +46,7 @@ class GameController(
 
     val renderer = SceneRenderer()
     var hud: GameHUD? = null
+        set(value) { field = value; value?.hudSetCreatine(totalCreatine) }
 
     var state = State.TITLE
         private set

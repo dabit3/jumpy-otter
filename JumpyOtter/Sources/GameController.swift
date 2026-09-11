@@ -26,7 +26,9 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
     }
 
     let scene = SCNScene()
-    weak var hud: GameHUD?
+    weak var hud: GameHUD? {
+        didSet { hud?.hudSetCreatine(totalCreatine) }
+    }
 
     private(set) var state: State = .title
 
