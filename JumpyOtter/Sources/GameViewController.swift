@@ -137,12 +137,13 @@ final class GameViewController: UIViewController, GameHUD {
         ])
     }
 
-    private func styleCard(_ card: UIView, radius: CGFloat = 16, border: CGFloat = 2, alpha: CGFloat = 0.78) {
+    private func styleCard(_ card: UIView, radius: CGFloat = 16, border: CGFloat = 2, alpha: CGFloat = 0.78,
+                           borderColor: UIColor = Palette.accentGold) {
         card.backgroundColor = Palette.hudNavy.withAlphaComponent(alpha)
         card.layer.cornerRadius = radius
         card.layer.cornerCurve = .continuous
         card.layer.borderWidth = border
-        card.layer.borderColor = Palette.accentGold.cgColor
+        card.layer.borderColor = borderColor.cgColor
         card.layer.shadowColor = UIColor.black.cgColor
         card.layer.shadowOpacity = 0.35
         card.layer.shadowRadius = 8
@@ -163,7 +164,7 @@ final class GameViewController: UIViewController, GameHUD {
 
     private func setupHUD() {
         // score card
-        styleCard(scoreCard)
+        styleCard(scoreCard, border: 2.5, alpha: 0.85, borderColor: Palette.hotOrange)
         view.addSubview(scoreCard)
         let scoreCaption = caption("SCORE")
         scoreLabel.display = "0"
@@ -337,7 +338,7 @@ final class GameViewController: UIViewController, GameHUD {
         bob(logo)
 
         // ---- Game over card ----
-        styleCard(gameOverPanel, radius: 26, border: 3, alpha: 0.92)
+        styleCard(gameOverPanel, radius: 26, border: 3, alpha: 0.92, borderColor: Palette.hotOrange)
         gameOverPanel.accessibilityIdentifier = "gameOverPanel"
         gameOverPanel.isHidden = true
         view.addSubview(gameOverPanel)

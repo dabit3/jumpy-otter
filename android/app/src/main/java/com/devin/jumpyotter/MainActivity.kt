@@ -220,12 +220,12 @@ class MainActivity : Activity(), GameHUD {
             setPadding(dp(18f), dp(8f), dp(18f), dp(10f))
             elevation = dpf(6f)
         }
-        scoreStack.addView(caption("SCORE"))
+        scoreStack.addView(caption("SCORE"), wrap())
         scoreLabel = arcade(40f, Palette.hudCream, "0", outlineDp = 3f).apply {
             contentDescription = "score"
             typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
         }
-        scoreStack.addView(scoreLabel)
+        scoreStack.addView(scoreLabel, wrap())
         scoreCard = scoreStack
         root.addView(scoreCard, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP or Gravity.START).apply {
             topMargin = dp(28f); leftMargin = dp(16f)
@@ -289,7 +289,7 @@ class MainActivity : Activity(), GameHUD {
         val steer = caption("SWIPE TO STEER", Palette.hudSilver).apply { textSize = 13f }
         val credits = caption("1UP  ·  CREDITS 99  ·  PRESS TO START", Palette.hudSilver)
 
-        titleOverlay.addView(ribbon)
+        titleOverlay.addView(ribbon, wrap())
         titleOverlay.addView(logoTop, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(6f) })
         titleOverlay.addView(logoBottom, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = -dp(14f) })
         titleOverlay.addView(hiScoreLabel, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(14f) })
@@ -324,15 +324,18 @@ class MainActivity : Activity(), GameHUD {
         finalScoreLabel = arcade(56f, Palette.hudCream, "0", outlineDp = 4f).apply { contentDescription = "finalScore" }
         bestLabel = arcade(18f, Palette.accentGold, outlineDp = 2f, letterSpacing = 0.1f)
         val retry = arcade(20f, Palette.hudCream, "TAP TO RETRY", outlineDp = 3f, letterSpacing = 0.12f)
-        gameOverPanel.addView(title)
+        gameOverPanel.addView(title, wrap())
         gameOverPanel.addView(rankPill, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(10f) })
         gameOverPanel.addView(scoreCaption, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(16f) })
-        gameOverPanel.addView(finalScoreLabel)
+        gameOverPanel.addView(finalScoreLabel, wrap())
         gameOverPanel.addView(bestLabel, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(8f) })
         gameOverPanel.addView(retry, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(22f) })
         root.addView(gameOverPanel, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER).apply { bottomMargin = dp(60f) })
         pulse(retry)
     }
+
+    // vertical LinearLayout defaults children to MATCH_PARENT width, so wide labels must opt into WRAP
+    private fun wrap() = LinearLayout.LayoutParams(WRAP, WRAP)
 
     private fun pulse(v: View) {
         v.animate().alpha(0.35f).setDuration(700).withEndAction {
