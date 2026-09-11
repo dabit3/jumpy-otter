@@ -195,6 +195,21 @@ final class TerrainGenerator {
             }
         }
 
+        // wildflowers and grass tufts inside the playable strip
+        for col in K.minCol...K.maxCol where Float.random(in: 0..<1) < 0.28 {
+            let ox = Float(col) + Float.rand(-0.32...0.32)
+            let oz = Float.rand(-0.32...0.32)
+            let deco: SCNNode
+            if Float.random(in: 0..<1) < 0.55 {
+                deco = VoxelFactory.flower(color: Palette.flowerColors.randomElement()!)
+            } else {
+                deco = VoxelFactory.grassTuft()
+            }
+            deco.position = SCNVector3(ox, 0, oz)
+            deco.eulerAngles.y = Float.rand(0...Float.pi)
+            row.node.addChildNode(deco)
+        }
+
         // trees inside the playable strip
         guard row.index != 0 else { return }  // keep spawn row clear
         var cols = Array(K.minCol...K.maxCol).shuffled()
@@ -298,6 +313,24 @@ final class TerrainGenerator {
         water.geometry?.firstMaterial?.transparency = 0.92
         water.castsShadow = false
         row.node.addChildNode(water)
+        // foam streaks drifting with the current
+        var fx: Float = -K.visualHalfWidth + Float.rand(0.2...1.4)
+        while fx < K.visualHalfWidth - 0.6 {
+            let len = CGFloat(Float.rand(0.35...0.9))
+            let foam = VoxelFactory.box(w: len, h: 0.02, l: 0.06, color: Palette.waterFoam,
+                                        x: fx, y: -0.095, z: Float.rand(-0.4...0.4), chamfer: 0)
+            foam.castsShadow = false
+            foam.opacity = 0.75
+            let drift = CGFloat(Float.rand(0.8...1.6))
+            foam.runAction(.repeatForever(.sequence([
+                .moveBy(x: drift, y: 0, z: 0, duration: TimeInterval(Float.rand(1.6...2.8))),
+                .fadeOut(duration: 0.3),
+                .moveBy(x: -drift, y: 0, z: 0, duration: 0),
+                .fadeOpacity(to: 0.75, duration: 0.3),
+            ])))
+            row.node.addChildNode(foam)
+            fx += Float.rand(1.8...3.6)
+        }
 
         // alternate direction within river groups
         lastRiverDir = -lastRiverDir

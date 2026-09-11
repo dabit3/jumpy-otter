@@ -4,11 +4,13 @@ import UIKit
 protocol GameHUD: AnyObject {
     func hudSetScore(_ score: Int)
     func hudSetCreatine(_ creatine: Int)
-    func hudGameOver(score: Int, best: Int, creatine: Int)
+    func hudGameOver(score: Int, best: Int, creatine: Int, newBest: Bool)
     func hudStarted()
-    func hudShowTitle()
+    func hudShowTitle(best: Int)
     func hudSetRivals(_ rivals: [RivalStatus])
     func hudBanner(_ text: String, color: UIColor)
+    /// Full-screen colour flash (deaths, records).
+    func hudFlash(_ color: UIColor)
 }
 
 struct RivalStatus {
@@ -24,7 +26,9 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
     }
 
     let scene = SCNScene()
-    weak var hud: GameHUD?
+    weak var hud: GameHUD? {
+        didSet { hud?.hudSetCreatine(totalCreatine) }
+    }
 
     private(set) var state: State = .title
 
@@ -87,6 +91,7 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
     private var stateSendTimer: Float = 0
     private var lastSentState: (row: Int, x: Float)?
     private var announcedWin = false
+    private var announcedRecord = false
 
     // MARK: - Setup
 
@@ -125,15 +130,16 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
     private func setupLights() {
         let ambient = SCNLight()
         ambient.type = .ambient
-        ambient.intensity = 550
-        ambient.color = UIColor(white: 1, alpha: 1)
+        ambient.intensity = 560
+        ambient.color = UIColor(red: 0.90, green: 0.95, blue: 1.0, alpha: 1)
         let ambientNode = SCNNode()
         ambientNode.light = ambient
         scene.rootNode.addChildNode(ambientNode)
 
         let sun = SCNLight()
         sun.type = .directional
-        sun.intensity = 750
+        sun.intensity = 780
+        sun.color = UIColor(red: 1.0, green: 0.96, blue: 0.88, alpha: 1)
         sun.castsShadow = true
         sun.shadowMapSize = CGSize(width: 2048, height: 2048)
         sun.shadowRadius = 4
@@ -172,6 +178,7 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         inputLock.lock(); inputQueue.removeAll(); inputLock.unlock()
 
         announcedWin = false
+        announcedRecord = false
         lastSentState = nil
         mp.sendState(row: 0, x: 0, score: 0, alive: true)
 
@@ -220,7 +227,7 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         guard shouldRestart else { return }
         state = .title
         startFresh()
-        hud?.hudShowTitle()
+        hud?.hudShowTitle(best: best)
     }
 
     private func enqueue(_ dir: Dir) {
@@ -409,6 +416,21 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         if rowIndex > score {
             score = rowIndex
             hud?.hudSetScore(score)
+            if score % K.milestoneEvery == 0 {
+                hud?.hudBanner("\(score) ROWS!", color: Palette.accentGold)
+            }
+            if score > best && !announcedRecord && best > 0 {
+                announcedRecord = true
+                hud?.hudBanner("NEW RECORD!", color: Palette.accentGold)
+                hud?.hudFlash(Palette.accentGold.withAlphaComponent(0.35))
+            }
+        }
+
+        // landing feedback
+        if row.kind == .river {
+            spawnBurst(at: SCNVector3(x, 0.15, Float(rowIndex)), color: Palette.waterFoam, count: 4, size: 0.05...0.09, spread: 0.6)
+        } else {
+            spawnBurst(at: SCNVector3(x, 0.05, Float(rowIndex)), color: Palette.hudCream, count: 4, size: 0.05...0.09, spread: 0.6)
         }
 
         // creatine
@@ -424,6 +446,7 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
                 .group([.moveBy(x: 0, y: 1.2, z: 0, duration: 0.25), .fadeOut(duration: 0.25)]),
                 .removeFromParentNode(),
             ]))
+            spawnBurst(at: SCNVector3(x, 0.6, Float(rowIndex)), color: Palette.accentGold, count: 10, size: 0.05...0.11, spread: 1.0)
             hud?.hudSetCreatine(totalCreatine)
         }
 
@@ -559,6 +582,7 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         playerNode.position.y = terrain.rows[Int(p.z.rounded())]?.surfaceY ?? 0
         spawnBurst(at: SCNVector3(p.x, 0.4, p.z), color: Palette.otter, count: 14)
         shakeCamera()
+        hud?.hudFlash(Palette.dangerRed.withAlphaComponent(0.45))
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
             self?.finishGameOver()
         }
@@ -569,7 +593,8 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         state = .dying
         SoundManager.shared.play("splash", volume: 1.0)
         isHopping = false
-        spawnBurst(at: SCNVector3(playerX, 0.2, Float(playerRow)), color: Palette.water, count: 16)
+        spawnBurst(at: SCNVector3(playerX, 0.2, Float(playerRow)), color: Palette.waterFoam, count: 16)
+        hud?.hudFlash(Palette.water.withAlphaComponent(0.4))
         let sink = SCNAction.group([
             .moveBy(x: 0, y: -1.2, z: 0, duration: 0.45),
             .fadeOut(duration: 0.45),
@@ -590,11 +615,12 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
     private func finishGameOver() {
         guard state == .dying else { return }
         state = .gameOver
-        if score > best {
+        let newBest = score > best
+        if newBest {
             best = score
             UserDefaults.standard.set(best, forKey: "best")
         }
-        hud?.hudGameOver(score: score, best: best, creatine: totalCreatine)
+        hud?.hudGameOver(score: score, best: best, creatine: totalCreatine, newBest: newBest)
         mp.sendGameOver(score: score)
         mp.sendState(row: playerRow, x: playerX, score: score, alive: false)
     }
@@ -768,15 +794,16 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
 
     // MARK: - Effects
 
-    private func spawnBurst(at pos: SCNVector3, color: UIColor, count: Int) {
+    private func spawnBurst(at pos: SCNVector3, color: UIColor, count: Int,
+                            size: ClosedRange<Float> = 0.06...0.14, spread: Float = 1.2) {
         for _ in 0..<count {
-            let s = CGFloat(Float.rand(0.06...0.14))
+            let s = CGFloat(Float.rand(size))
             let piece = VoxelFactory.box(w: s, h: s, l: s, color: color, chamfer: 0)
             piece.position = pos
             piece.castsShadow = false
             worldNode.addChildNode(piece)
-            let vx = CGFloat(Float.rand(-1.2...1.2))
-            let vz = CGFloat(Float.rand(-1.2...1.2))
+            let vx = CGFloat(Float.rand(-spread...spread))
+            let vz = CGFloat(Float.rand(-spread...spread))
             let up = SCNAction.moveBy(x: vx * 0.4, y: CGFloat(Float.rand(0.5...1.1)), z: vz * 0.4, duration: 0.18)
             up.timingMode = .easeOut
             let downDist = CGFloat(Float.rand(0.7...1.3))
