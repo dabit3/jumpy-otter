@@ -11,6 +11,13 @@ It ships for two platforms from one repo:
   same procedural world, same multiplayer protocol, so an iPhone and an Android
   phone can play against each other through the relay.
 
+Both builds share one "arcade edition" presentation: outlined arcade type, navy
+HUD cards (score / creatine / rival chips), an attract-mode title with HI-SCORE
+and credits line, milestone and NEW RECORD banners, a ranked game-over card
+(ROOKIE → HOPPER → PRO → LEGEND → OTTERLORD) with score count-up, plus landing
+puffs, pickup sparkles, death flashes, flowers, water foam and glowing pickup
+pads in the world.
+
 ## Run in Xcode
 
 1. Open `JumpyOtter.xcodeproj`.
