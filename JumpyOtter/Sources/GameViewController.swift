@@ -852,7 +852,7 @@ final class GameViewController: UIViewController, GameHUD, UIGestureRecognizerDe
     func hudSkin(_ skin: Skin, next: Skin?, total: Int) {
         DispatchQueue.main.async {
             self.skinLabel.display = "◀  \(skin.name)  ▶"
-            self.skinLabel.fill = skin.fur
+            self.skinLabel.fill = skin.labelColor
             if let next {
                 self.skinHint.display = "SWIPE ◀ ▶  ·  \(next.name) AT \(next.unlockAt) CREATINE"
             } else {

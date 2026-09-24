@@ -641,7 +641,7 @@ class MainActivity : Activity(), GameHUD {
     override fun hudSkin(skin: Skin, next: Skin?, total: Int) {
         runOnUiThread {
             skinLabel.text = "◀  ${skin.name}  ▶"
-            skinLabel.setFill(skin.fur.toArgb())
+            skinLabel.setFill(skin.labelColor.toArgb())
             skinHint.text = if (next != null) "SWIPE ◀ ▶  ·  ${next.name} AT ${next.unlockAt} CREATINE"
                 else "SWIPE ◀ ▶  ·  ALL OTTERS UNLOCKED"
             skinCard.background = cardBackground(Palette.hudNavy, skin.fur, radiusDp = 18f, alpha = 0.85f)

@@ -49,6 +49,13 @@ struct Skin {
     let dark: UIColor
     let belly: UIColor
     let unlockAt: Int
+
+    /// Fur colour, or the lighter belly colour when the fur is too dark to read on navy HUD cards.
+    var labelColor: UIColor {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        fur.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return 0.299 * r + 0.587 * g + 0.114 * b < 0.5 ? belly : fur
+    }
 }
 
 enum Skins {

@@ -45,7 +45,10 @@ object K {
 }
 
 /** Unlockable otter colourways, earned with lifetime creatine. */
-class Skin(val name: String, val fur: Rgb, val dark: Rgb, val belly: Rgb, val unlockAt: Int)
+class Skin(val name: String, val fur: Rgb, val dark: Rgb, val belly: Rgb, val unlockAt: Int) {
+    /** Fur colour, or the lighter belly colour when the fur is too dark to read on navy HUD cards. */
+    val labelColor: Rgb get() = if (0.299f * fur.r + 0.587f * fur.g + 0.114f * fur.b < 0.5f) belly else fur
+}
 
 object Skins {
     val all: List<Skin> by lazy {
