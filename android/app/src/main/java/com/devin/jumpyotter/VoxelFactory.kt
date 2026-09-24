@@ -28,34 +28,34 @@ object VoxelFactory {
 
     // MARK: - Wiskers (player), built facing +Z
 
-    fun wiskersInto(mb: MeshBuilder) = with(mb) {
+    fun wiskersInto(mb: MeshBuilder, skin: Skin = Skins.all[0]) = with(mb) {
         // long tapered tail
-        box(0.28f, 0.24f, 0.42f, Palette.otterDark, -0.04f, 0.25f, -0.37f)
-        box(0.23f, 0.19f, 0.38f, Palette.otterDark, 0.05f, 0.18f, -0.69f, rotY = -0.28f)
-        box(0.16f, 0.14f, 0.30f, Palette.otter, 0.16f, 0.13f, -0.96f, rotY = -0.38f)
+        box(0.28f, 0.24f, 0.42f, skin.dark, -0.04f, 0.25f, -0.37f)
+        box(0.23f, 0.19f, 0.38f, skin.dark, 0.05f, 0.18f, -0.69f, rotY = -0.28f)
+        box(0.16f, 0.14f, 0.30f, skin.fur, 0.16f, 0.13f, -0.96f, rotY = -0.38f)
         // body and cream belly
-        box(0.50f, 0.52f, 0.48f, Palette.otterDark, 0f, 0.34f, 0f)
-        box(0.34f, 0.34f, 0.07f, Palette.otterCream, 0f, 0.38f, 0.275f)
+        box(0.50f, 0.52f, 0.48f, skin.dark, 0f, 0.34f, 0f)
+        box(0.34f, 0.34f, 0.07f, skin.belly, 0f, 0.38f, 0.275f)
         // arms
-        box(0.11f, 0.34f, 0.22f, Palette.otter, 0.29f, 0.39f, 0.03f)
-        box(0.11f, 0.34f, 0.22f, Palette.otter, -0.29f, 0.39f, 0.03f)
+        box(0.11f, 0.34f, 0.22f, skin.fur, 0.29f, 0.39f, 0.03f)
+        box(0.11f, 0.34f, 0.22f, skin.fur, -0.29f, 0.39f, 0.03f)
         // feet
-        box(0.22f, 0.15f, 0.30f, Palette.otter, 0.15f, 0.075f, 0.10f)
-        box(0.22f, 0.15f, 0.30f, Palette.otter, -0.15f, 0.075f, 0.10f)
+        box(0.22f, 0.15f, 0.30f, skin.fur, 0.15f, 0.075f, 0.10f)
+        box(0.22f, 0.15f, 0.30f, skin.fur, -0.15f, 0.075f, 0.10f)
         // head and ears
-        box(0.57f, 0.43f, 0.46f, Palette.otter, 0f, 0.76f, 0.05f)
-        box(0.15f, 0.17f, 0.18f, Palette.otterDark, 0.31f, 0.86f, 0.01f)
-        box(0.15f, 0.17f, 0.18f, Palette.otterDark, -0.31f, 0.86f, 0.01f)
-        box(0.08f, 0.09f, 0.04f, Palette.otter, 0.315f, 0.86f, 0.115f)
-        box(0.08f, 0.09f, 0.04f, Palette.otter, -0.315f, 0.86f, 0.115f)
+        box(0.57f, 0.43f, 0.46f, skin.fur, 0f, 0.76f, 0.05f)
+        box(0.15f, 0.17f, 0.18f, skin.dark, 0.31f, 0.86f, 0.01f)
+        box(0.15f, 0.17f, 0.18f, skin.dark, -0.31f, 0.86f, 0.01f)
+        box(0.08f, 0.09f, 0.04f, skin.fur, 0.315f, 0.86f, 0.115f)
+        box(0.08f, 0.09f, 0.04f, skin.fur, -0.315f, 0.86f, 0.115f)
         // eyes and highlights
         box(0.075f, 0.13f, 0.055f, Palette.black, 0.16f, 0.82f, 0.295f)
         box(0.075f, 0.13f, 0.055f, Palette.black, -0.16f, 0.82f, 0.295f)
         box(0.025f, 0.035f, 0.02f, Palette.white, 0.148f, 0.85f, 0.334f)
         box(0.025f, 0.035f, 0.02f, Palette.white, -0.172f, 0.85f, 0.334f)
         // white cheek muzzle and black nose
-        box(0.24f, 0.17f, 0.07f, Palette.otterCream, 0.105f, 0.68f, 0.315f)
-        box(0.24f, 0.17f, 0.07f, Palette.otterCream, -0.105f, 0.68f, 0.315f)
+        box(0.24f, 0.17f, 0.07f, skin.belly, 0.105f, 0.68f, 0.315f)
+        box(0.24f, 0.17f, 0.07f, skin.belly, -0.105f, 0.68f, 0.315f)
         box(0.15f, 0.105f, 0.09f, Palette.black, 0f, 0.735f, 0.375f)
         box(0.035f, 0.08f, 0.035f, Palette.black, 0f, 0.65f, 0.37f)
         // whiskers
@@ -66,7 +66,7 @@ object VoxelFactory {
         }
     }
 
-    fun wiskers(): Node = model { wiskersInto(this) }.also { it.name = "wiskers" }
+    fun wiskers(skin: Skin = Skins.all[0]): Node = model { wiskersInto(this, skin) }.also { it.name = "wiskers" }
 
     // MARK: - Trees
 

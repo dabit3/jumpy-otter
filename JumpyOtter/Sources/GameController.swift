@@ -4,9 +4,17 @@ import UIKit
 protocol GameHUD: AnyObject {
     func hudSetScore(_ score: Int)
     func hudSetCreatine(_ creatine: Int)
-    func hudGameOver(score: Int, best: Int, creatine: Int, newBest: Bool)
+    /// `placement` is the 1-based leaderboard slot this run earned, if any.
+    func hudGameOver(score: Int, best: Int, creatine: Int, newBest: Bool, placement: Int?)
     func hudStarted()
-    func hudShowTitle(best: Int)
+    func hudShowTitle(best: Int, board: [Int])
+    /// Selected skin plus the next locked one (nil once everything is unlocked).
+    func hudSkin(_ skin: Skin, next: Skin?, total: Int)
+    func hudCombo(_ combo: Int)
+    /// Small pop-up callout near the player (close calls, combo bonuses).
+    func hudToast(_ text: String, color: UIColor)
+    func hudPaused(_ paused: Bool)
+    func hudHaptic(_ kind: Haptic)
     func hudSetRivals(_ rivals: [RivalStatus])
     func hudBanner(_ text: String, color: UIColor)
     /// Full-screen colour flash (deaths, records).
@@ -27,10 +35,14 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
 
     let scene = SCNScene()
     weak var hud: GameHUD? {
-        didSet { hud?.hudSetCreatine(totalCreatine) }
+        didSet {
+            hud?.hudSetCreatine(totalCreatine)
+            hud?.hudSkin(Skins.all[skinIndex], next: Skins.next(after: totalCreatine), total: totalCreatine)
+        }
     }
 
     private(set) var state: State = .title
+    private(set) var isPaused = false
 
     // world
     private let worldNode = SCNNode()
@@ -55,6 +67,8 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
     private let inputLock = NSLock()
     private var inputQueue: [Dir] = []
     private var restartRequested = false
+    private var pendingSkinStep = 0
+    private var pendingPause: Bool?
 
     // scoring
     private var score = 0
@@ -67,6 +81,19 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         return defaults.integer(forKey: "totalCoins")
     }()
     private var best = UserDefaults.standard.integer(forKey: "best")
+    private lazy var board: [Int] = {
+        if let saved = UserDefaults.standard.array(forKey: "top5") as? [Int] { return saved }
+        return best > 0 ? [best] : []
+    }()
+    private lazy var skinIndex: Int = {
+        let saved = UserDefaults.standard.integer(forKey: "skin")
+        return Skins.isUnlocked(saved, total: totalCreatine) ? saved : 0
+    }()
+
+    // combo
+    private var clock: Float = 0
+    private var combo = 0
+    private var lastForwardLand: Float = -10
 
     // timing
     private var lastTime: TimeInterval = -1
@@ -158,8 +185,13 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         eagleNode?.removeFromParentNode()
         eagleNode = nil
         playerNode.removeFromParentNode()
-        playerNode = VoxelFactory.wiskers()
+        playerNode = VoxelFactory.wiskers(skin: Skins.all[skinIndex])
         playerNode.position = SCNVector3(0, 0, 0)
+        isPaused = false
+        scene.isPaused = false
+        combo = 0
+        lastForwardLand = -10
+        hud?.hudCombo(0)
         worldNode.addChildNode(playerNode)
 
         playerRow = 0
@@ -204,12 +236,29 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
     }
 
     func handleSwipe(_ dir: Dir) {
-        guard state == .playing || state == .title else { return }
+        guard !isPaused, state == .playing || state == .title else { return }
+        if state == .title, dir == .left || dir == .right {
+            inputLock.lock()
+            pendingSkinStep += dir == .right ? 1 : -1
+            inputLock.unlock()
+            return
+        }
         if state == .title {
             state = .playing
             hud?.hudStarted()
         }
         enqueue(dir)
+    }
+
+    /// Requests pause/resume; only takes effect while a run is in progress.
+    func setPaused(_ paused: Bool) {
+        inputLock.lock()
+        pendingPause = paused
+        inputLock.unlock()
+    }
+
+    func presentTitle() {
+        hud?.hudShowTitle(best: best, board: board)
     }
 
     func restart() {
@@ -227,7 +276,54 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         guard shouldRestart else { return }
         state = .title
         startFresh()
-        hud?.hudShowTitle(best: best)
+        hud?.hudShowTitle(best: best, board: board)
+    }
+
+    private func applyPendingPause() {
+        inputLock.lock()
+        let request = pendingPause
+        pendingPause = nil
+        inputLock.unlock()
+        guard let request, request != isPaused else { return }
+        guard !request || state == .playing else { return }
+        isPaused = request
+        scene.isPaused = request
+        hud?.hudPaused(request)
+    }
+
+    private func applyPendingSkin() {
+        inputLock.lock()
+        let step = pendingSkinStep
+        pendingSkinStep = 0
+        inputLock.unlock()
+        guard step != 0, state == .title else { return }
+        let count = Skins.all.count
+        var idx = skinIndex
+        repeat {
+            idx = ((idx + step.signum()) % count + count) % count
+        } while !Skins.isUnlocked(idx, total: totalCreatine)
+        guard idx != skinIndex else { bumpAnimation(); return }
+        skinIndex = idx
+        UserDefaults.standard.set(idx, forKey: "skin")
+
+        let old = playerNode
+        let fresh = VoxelFactory.wiskers(skin: Skins.all[idx])
+        fresh.position = SCNVector3(playerX, old.position.y, Float(playerRow))
+        fresh.eulerAngles = old.eulerAngles
+        old.removeFromParentNode()
+        worldNode.addChildNode(fresh)
+        playerNode = fresh
+        let spin = SCNAction.rotateBy(x: 0, y: CGFloat.pi * 2, z: 0, duration: 0.4)
+        spin.timingMode = .easeOut
+        let jump = SCNAction.sequence([
+            .moveBy(x: 0, y: 0.6, z: 0, duration: 0.2),
+            .moveBy(x: 0, y: -0.6, z: 0, duration: 0.2),
+        ])
+        fresh.runAction(.group([spin, jump]))
+        spawnBurst(at: SCNVector3(playerX, 0.5, Float(playerRow)), color: Skins.all[idx].fur, count: 10, size: 0.05...0.1, spread: 0.9)
+        SoundManager.shared.play("coin", volume: 0.6)
+        hud?.hudHaptic(.light)
+        hud?.hudSkin(Skins.all[idx], next: Skins.next(after: totalCreatine), total: totalCreatine)
     }
 
     private func enqueue(_ dir: Dir) {
@@ -240,9 +336,17 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
 
     func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
         applyPendingRestart()
+        applyPendingPause()
+        applyPendingSkin()
         if lastTime < 0 { lastTime = time }
         let dt = Float(min(time - lastTime, 1.0 / 30.0))
         lastTime = time
+        if isPaused { return }
+        clock += dt
+        if combo > 0, clock - lastForwardLand > K.comboWindow + Float(K.hopDuration) {
+            combo = 0
+            hud?.hudCombo(0)
+        }
 
         processMultiplayer(dt: dt)
         updateRows(dt: dt)
@@ -384,10 +488,23 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
             bumpAnimation(); return
         }
 
+        if dir.dz != 0, let current = terrain.rows[playerRow], current.kind == .road {
+            let closeCall = current.objects.contains {
+                let gap = abs($0.presentationX - playerX) - $0.halfLen - K.playerHalfWidth
+                let approaching = ($0.presentationX - playerX) * current.dir < 0
+                return approaching && gap < K.closeCallMargin
+            }
+            if closeCall {
+                hud?.hudToast("CLOSE CALL!", color: Palette.hotOrange)
+                hud?.hudHaptic(.medium)
+            }
+        }
+
         isHopping = true
         ridingLog = nil
         ridingRow = nil
         SoundManager.shared.play("hop", volume: 0.9)
+        hud?.hudHaptic(.light)
 
         let targetY = targetRow.surfaceY
         let move = SCNAction.move(to: SCNVector3(targetX, targetY, Float(targetRowIndex)), duration: K.hopDuration)
@@ -416,6 +533,15 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         if rowIndex > score {
             score = rowIndex
             hud?.hudSetScore(score)
+            combo = clock - lastForwardLand <= K.comboWindow + Float(K.hopDuration) ? combo + 1 : 1
+            lastForwardLand = clock
+            hud?.hudCombo(combo)
+            if combo % K.comboBonusEvery == 0 {
+                awardCreatine(1)
+                SoundManager.shared.play("coin", volume: 0.7)
+                hud?.hudToast("x\(combo) COMBO  +1", color: Palette.accentGold)
+                hud?.hudHaptic(.success)
+            }
             if score % K.milestoneEvery == 0 {
                 hud?.hudBanner("\(score) ROWS!", color: Palette.accentGold)
             }
@@ -423,6 +549,7 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
                 announcedRecord = true
                 hud?.hudBanner("NEW RECORD!", color: Palette.accentGold)
                 hud?.hudFlash(Palette.accentGold.withAlphaComponent(0.35))
+                hud?.hudHaptic(.success)
             }
         }
 
@@ -438,8 +565,8 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         if let bottle = row.creatine[col] {
             row.creatine.removeValue(forKey: col)
             creatineCollected += 1
-            totalCreatine += 1
-            UserDefaults.standard.set(totalCreatine, forKey: "totalCreatine")
+            awardCreatine(1)
+            hud?.hudHaptic(.success)
             SoundManager.shared.play("coin", volume: 0.9)
             mp.sendGarbage(amount: 1)
             bottle.runAction(.sequence([
@@ -447,7 +574,6 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
                 .removeFromParentNode(),
             ]))
             spawnBurst(at: SCNVector3(x, 0.6, Float(rowIndex)), color: Palette.accentGold, count: 10, size: 0.05...0.11, spread: 1.0)
-            hud?.hudSetCreatine(totalCreatine)
         }
 
         sendStateIfChanged()
@@ -460,6 +586,17 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
             } else {
                 drown()
             }
+        }
+    }
+
+    private func awardCreatine(_ amount: Int) {
+        let before = totalCreatine
+        totalCreatine += amount
+        UserDefaults.standard.set(totalCreatine, forKey: "totalCreatine")
+        hud?.hudSetCreatine(totalCreatine)
+        for skin in Skins.all where skin.unlockAt > before && skin.unlockAt <= totalCreatine {
+            hud?.hudBanner("\(skin.name) OTTER UNLOCKED!", color: skin.fur)
+            hud?.hudFlash(skin.fur.withAlphaComponent(0.35))
         }
     }
 
@@ -542,6 +679,7 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         eagleTriggered = true
         state = .dying
         SoundManager.shared.play("eagle", volume: 1.0)
+        hud?.hudHaptic(.heavy)
 
         let p = playerNode.presentation.position
         let eagle = VoxelFactory.eagle()
@@ -580,8 +718,9 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         playerNode.position = p
         playerNode.scale = SCNVector3(1.5, 0.08, 1.5)
         playerNode.position.y = terrain.rows[Int(p.z.rounded())]?.surfaceY ?? 0
-        spawnBurst(at: SCNVector3(p.x, 0.4, p.z), color: Palette.otter, count: 14)
+        spawnBurst(at: SCNVector3(p.x, 0.4, p.z), color: Skins.all[skinIndex].fur, count: 14)
         shakeCamera()
+        hud?.hudHaptic(.heavy)
         hud?.hudFlash(Palette.dangerRed.withAlphaComponent(0.45))
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
             self?.finishGameOver()
@@ -595,6 +734,7 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
         isHopping = false
         spawnBurst(at: SCNVector3(playerX, 0.2, Float(playerRow)), color: Palette.waterFoam, count: 16)
         hud?.hudFlash(Palette.water.withAlphaComponent(0.4))
+        hud?.hudHaptic(.heavy)
         let sink = SCNAction.group([
             .moveBy(x: 0, y: -1.2, z: 0, duration: 0.45),
             .fadeOut(duration: 0.45),
@@ -620,7 +760,18 @@ final class GameController: NSObject, SCNSceneRendererDelegate {
             best = score
             UserDefaults.standard.set(best, forKey: "best")
         }
-        hud?.hudGameOver(score: score, best: best, creatine: totalCreatine, newBest: newBest)
+        var placement: Int?
+        if score > 0 {
+            var updated = board + [score]
+            updated.sort(by: >)
+            updated = Array(updated.prefix(K.leaderboardSize))
+            if let idx = updated.firstIndex(of: score) { placement = idx + 1 }
+            board = updated
+            UserDefaults.standard.set(board, forKey: "top5")
+        }
+        combo = 0
+        hud?.hudCombo(0)
+        hud?.hudGameOver(score: score, best: best, creatine: totalCreatine, newBest: newBest, placement: placement)
         mp.sendGameOver(score: score)
         mp.sendState(row: playerRow, x: playerX, score: score, alive: false)
     }

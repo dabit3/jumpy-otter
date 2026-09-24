@@ -7,6 +7,11 @@ import android.media.SoundPool
 enum class Sfx { HOP, COIN, HIT, SPLASH, BUMP, TRAIN, BELL, EAGLE }
 
 class SoundManager(context: Context) {
+    private val prefs = context.getSharedPreferences("jumpyotter", Context.MODE_PRIVATE)
+
+    var enabled: Boolean = prefs.getBoolean("soundOn", true)
+        set(value) { field = value; prefs.edit().putBoolean("soundOn", value).apply() }
+
     private val pool = SoundPool.Builder()
         .setMaxStreams(6)
         .setAudioAttributes(
@@ -29,6 +34,7 @@ class SoundManager(context: Context) {
     )
 
     fun play(sfx: Sfx, volume: Float = 1f) {
+        if (!enabled) return
         val id = ids[sfx] ?: return
         pool.play(id, volume, volume, 1, 0, 1f)
     }

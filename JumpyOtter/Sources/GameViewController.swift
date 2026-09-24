@@ -44,7 +44,7 @@ final class ArcadeLabel: UILabel {
     }
 }
 
-final class GameViewController: UIViewController, GameHUD {
+final class GameViewController: UIViewController, GameHUD, UIGestureRecognizerDelegate {
 
     private var scnView: SCNView!
     private var game: GameController!
@@ -62,6 +62,20 @@ final class GameViewController: UIViewController, GameHUD {
     private let rivalStack = UIStackView()
     private var rivalChips: [Int: (chip: UIView, dot: UIView, label: ArcadeLabel)] = [:]
     private let bannerLabel = ArcadeLabel(size: 30)
+    private let comboLabel = ArcadeLabel(size: 22, monospacedDigits: true)
+    private let toastLabel = ArcadeLabel(size: 26)
+    private let pauseButton = UIButton(type: .custom)
+
+    // Pause overlay
+    private let pauseOverlay = UIView()
+    private let soundButton = UIButton(type: .custom)
+    private let soundLabel = ArcadeLabel(size: 16, weight: .heavy)
+
+    // haptics
+    private let lightTap = UIImpactFeedbackGenerator(style: .light)
+    private let mediumTap = UIImpactFeedbackGenerator(style: .medium)
+    private let heavyTap = UIImpactFeedbackGenerator(style: .heavy)
+    private let notifier = UINotificationFeedbackGenerator()
 
     // Title overlay
     private let titleOverlay = UIView()
@@ -70,6 +84,14 @@ final class GameViewController: UIViewController, GameHUD {
     private let hiScoreLabel = ArcadeLabel(size: 18, monospacedDigits: true)
     private let tapLabel = ArcadeLabel(size: 26)
     private let creditsLabel = ArcadeLabel(size: 14, weight: .heavy)
+    private let logoStack = UIStackView()
+    private let boardCard = UIView()
+    private var boardRows: [ArcadeLabel] = []
+    private var attractTimer: Timer?
+    private var showingBoard = false
+    private let skinCard = UIView()
+    private let skinLabel = ArcadeLabel(size: 22)
+    private let skinHint = ArcadeLabel(size: 11, weight: .heavy)
 
     // Game over overlay
     private let gameOverPanel = UIView()
@@ -78,6 +100,7 @@ final class GameViewController: UIViewController, GameHUD {
     private let rankLabel = ArcadeLabel(size: 14, weight: .heavy)
     private let finalScoreLabel = ArcadeLabel(size: 60, monospacedDigits: true)
     private let bestLabel = ArcadeLabel(size: 20, monospacedDigits: true)
+    private let placementLabel = ArcadeLabel(size: 16, weight: .heavy)
     private let retryLabel = ArcadeLabel(size: 22)
     private var canRetry = false
     private var countUpTimer: Timer?
@@ -106,8 +129,18 @@ final class GameViewController: UIViewController, GameHUD {
         setupChrome()
         setupHUD()
         setupOverlays()
+        setupPause()
         setupGestures()
-        hudShowTitle(best: UserDefaults.standard.integer(forKey: "best"))
+        game.presentTitle()
+        attractTimer = Timer.scheduledTimer(withTimeInterval: 4.5, repeats: true) { [weak self] _ in
+            self?.advanceAttract()
+        }
+        NotificationCenter.default.addObserver(self, selector: #selector(appWillResignActive),
+                                               name: UIApplication.willResignActiveNotification, object: nil)
+    }
+
+    @objc private func appWillResignActive() {
+        game.setPaused(true)
     }
 
     override func viewDidLayoutSubviews() {
@@ -261,6 +294,139 @@ final class GameViewController: UIViewController, GameHUD {
             bannerLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -24),
             bannerLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 120),
         ])
+
+        // combo meter under the score card
+        comboLabel.fill = Palette.accentGold
+        comboLabel.kern = 1.5
+        comboLabel.outlineWidth = 5
+        comboLabel.alpha = 0
+        comboLabel.accessibilityIdentifier = "combo"
+        view.addSubview(comboLabel)
+        NSLayoutConstraint.activate([
+            comboLabel.topAnchor.constraint(equalTo: scoreCard.bottomAnchor, constant: 6),
+            comboLabel.centerXAnchor.constraint(equalTo: scoreCard.centerXAnchor),
+        ])
+
+        // toast callouts above the player
+        toastLabel.alpha = 0
+        toastLabel.kern = 1.5
+        toastLabel.outlineWidth = 6
+        view.addSubview(toastLabel)
+        NSLayoutConstraint.activate([
+            toastLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            toastLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -60),
+        ])
+
+        // pause button between the score and creatine cards
+        styleCard(pauseButton, radius: 22, border: 2, alpha: 0.8, borderColor: Palette.hudCream)
+        let bars = UIStackView()
+        bars.axis = .horizontal
+        bars.spacing = 5
+        bars.isUserInteractionEnabled = false
+        bars.translatesAutoresizingMaskIntoConstraints = false
+        for _ in 0..<2 {
+            let bar = UIView()
+            bar.backgroundColor = Palette.hudCream
+            bar.layer.cornerRadius = 2
+            bar.translatesAutoresizingMaskIntoConstraints = false
+            bar.widthAnchor.constraint(equalToConstant: 5).isActive = true
+            bar.heightAnchor.constraint(equalToConstant: 16).isActive = true
+            bars.addArrangedSubview(bar)
+        }
+        pauseButton.addSubview(bars)
+        pauseButton.accessibilityLabel = "Pause"
+        pauseButton.accessibilityIdentifier = "pause"
+        pauseButton.alpha = 0
+        pauseButton.isHidden = true
+        pauseButton.addTarget(self, action: #selector(onPauseButton), for: .touchUpInside)
+        view.addSubview(pauseButton)
+        NSLayoutConstraint.activate([
+            pauseButton.widthAnchor.constraint(equalToConstant: 44),
+            pauseButton.heightAnchor.constraint(equalToConstant: 44),
+            pauseButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            pauseButton.centerYAnchor.constraint(equalTo: creatineCard.centerYAnchor),
+            bars.centerXAnchor.constraint(equalTo: pauseButton.centerXAnchor),
+            bars.centerYAnchor.constraint(equalTo: pauseButton.centerYAnchor),
+        ])
+    }
+
+    private func setupPause() {
+        pauseOverlay.backgroundColor = UIColor(white: 0, alpha: 0.5)
+        pauseOverlay.isHidden = true
+        pauseOverlay.alpha = 0
+        pauseOverlay.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(pauseOverlay)
+
+        let card = UIView()
+        styleCard(card, radius: 26, border: 3, alpha: 0.94, borderColor: Palette.hotOrange)
+        pauseOverlay.addSubview(card)
+
+        let title = ArcadeLabel(size: 48)
+        title.display = "PAUSED"
+        title.fill = Palette.hotOrange
+        title.outlineWidth = 7
+        title.kern = 2
+
+        let resume = ArcadeLabel(size: 20)
+        resume.display = "TAP TO RESUME"
+        resume.kern = 2
+
+        soundButton.backgroundColor = Palette.hudInk
+        soundButton.layer.cornerRadius = 18
+        soundButton.layer.borderWidth = 2
+        soundButton.layer.borderColor = Palette.accentGold.cgColor
+        soundButton.translatesAutoresizingMaskIntoConstraints = false
+        soundButton.accessibilityIdentifier = "soundToggle"
+        soundButton.addTarget(self, action: #selector(onSoundButton), for: .touchUpInside)
+        soundLabel.kern = 2
+        soundLabel.outlineWidth = 0
+        soundLabel.isUserInteractionEnabled = false
+        soundButton.addSubview(soundLabel)
+        refreshSoundLabel()
+
+        let stack = UIStackView(arrangedSubviews: [title, soundButton, resume])
+        stack.axis = .vertical
+        stack.alignment = .center
+        stack.spacing = 22
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            pauseOverlay.topAnchor.constraint(equalTo: view.topAnchor),
+            pauseOverlay.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            pauseOverlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            pauseOverlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            card.centerXAnchor.constraint(equalTo: pauseOverlay.centerXAnchor),
+            card.centerYAnchor.constraint(equalTo: pauseOverlay.centerYAnchor, constant: -30),
+            card.widthAnchor.constraint(greaterThanOrEqualToConstant: 280),
+            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 28),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -28),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 32),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -32),
+            soundButton.heightAnchor.constraint(equalToConstant: 36),
+            soundLabel.centerYAnchor.constraint(equalTo: soundButton.centerYAnchor),
+            soundLabel.leadingAnchor.constraint(equalTo: soundButton.leadingAnchor, constant: 18),
+            soundLabel.trailingAnchor.constraint(equalTo: soundButton.trailingAnchor, constant: -18),
+        ])
+        pulse(resume)
+    }
+
+    private func refreshSoundLabel() {
+        let on = SoundManager.shared.enabled
+        soundLabel.display = on ? "♪  SOUND ON" : "♪  SOUND OFF"
+        soundLabel.fill = on ? Palette.accentGold : Palette.hudSilver
+        soundButton.layer.borderColor = (on ? Palette.accentGold : Palette.hudSilver).cgColor
+    }
+
+    @objc private func onPauseButton() {
+        game.setPaused(true)
+    }
+
+    @objc private func onSoundButton() {
+        SoundManager.shared.enabled.toggle()
+        refreshSoundLabel()
+        pop(soundButton, scale: 1.12)
+        lightTap.impactOccurred()
     }
 
     private func setupOverlays() {
@@ -302,13 +468,58 @@ final class GameViewController: UIViewController, GameHUD {
         hiScoreLabel.kern = 2
         hiScoreLabel.outlineWidth = 4
 
-        let titleStack = UIStackView(arrangedSubviews: [ribbon, logo, hiScoreLabel])
+        logoStack.addArrangedSubview(logo)
+        logoStack.addArrangedSubview(hiScoreLabel)
+        logoStack.axis = .vertical
+        logoStack.alignment = .center
+        logoStack.spacing = 26
+        logoStack.translatesAutoresizingMaskIntoConstraints = false
+
+        // attract swap: logo <-> high-score table
+        let attract = UIView()
+        attract.translatesAutoresizingMaskIntoConstraints = false
+        attract.addSubview(logoStack)
+        setupBoard()
+        attract.addSubview(boardCard)
+        NSLayoutConstraint.activate([
+            logoStack.topAnchor.constraint(equalTo: attract.topAnchor),
+            logoStack.bottomAnchor.constraint(equalTo: attract.bottomAnchor),
+            logoStack.leadingAnchor.constraint(equalTo: attract.leadingAnchor),
+            logoStack.trailingAnchor.constraint(equalTo: attract.trailingAnchor),
+            boardCard.centerXAnchor.constraint(equalTo: attract.centerXAnchor),
+            boardCard.centerYAnchor.constraint(equalTo: attract.centerYAnchor),
+        ])
+
+        let titleStack = UIStackView(arrangedSubviews: [ribbon, attract])
         titleStack.axis = .vertical
         titleStack.spacing = 18
         titleStack.alignment = .center
-        titleStack.setCustomSpacing(26, after: logo)
         titleStack.translatesAutoresizingMaskIntoConstraints = false
         titleOverlay.addSubview(titleStack)
+
+        // skin selector
+        styleCard(skinCard, radius: 18, border: 2, alpha: 0.82, borderColor: Palette.accentGold)
+        skinCard.accessibilityIdentifier = "skinCard"
+        titleOverlay.addSubview(skinCard)
+        skinLabel.kern = 2
+        skinLabel.outlineWidth = 5
+        skinLabel.accessibilityIdentifier = "skinName"
+        skinHint.kern = 1.5
+        skinHint.outlineWidth = 0
+        skinHint.fill = Palette.hudSilver
+        skinHint.layer.shadowOpacity = 0
+        let skinStack = UIStackView(arrangedSubviews: [skinLabel, skinHint])
+        skinStack.axis = .vertical
+        skinStack.alignment = .center
+        skinStack.spacing = 2
+        skinStack.translatesAutoresizingMaskIntoConstraints = false
+        skinCard.addSubview(skinStack)
+        NSLayoutConstraint.activate([
+            skinStack.topAnchor.constraint(equalTo: skinCard.topAnchor, constant: 8),
+            skinStack.bottomAnchor.constraint(equalTo: skinCard.bottomAnchor, constant: -9),
+            skinStack.leadingAnchor.constraint(equalTo: skinCard.leadingAnchor, constant: 20),
+            skinStack.trailingAnchor.constraint(equalTo: skinCard.trailingAnchor, constant: -20),
+        ])
 
         tapLabel.display = "TAP TO HOP"
         tapLabel.kern = 2
@@ -331,6 +542,8 @@ final class GameViewController: UIViewController, GameHUD {
             titleStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 104),
             promptStack.centerXAnchor.constraint(equalTo: titleOverlay.centerXAnchor),
             promptStack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -92),
+            skinCard.centerXAnchor.constraint(equalTo: titleOverlay.centerXAnchor),
+            skinCard.bottomAnchor.constraint(equalTo: promptStack.topAnchor, constant: -22),
             creditsLabel.centerXAnchor.constraint(equalTo: titleOverlay.centerXAnchor),
             creditsLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -22),
         ])
@@ -378,13 +591,19 @@ final class GameViewController: UIViewController, GameHUD {
         retryLabel.display = "TAP TO RETRY"
         retryLabel.kern = 2
 
-        let stack = UIStackView(arrangedSubviews: [gameOverTitle, rankPill, scoreCaption, finalScoreLabel, bestLabel, divider, retryLabel])
+        placementLabel.fill = Palette.hudCream
+        placementLabel.kern = 2
+        placementLabel.outlineWidth = 3
+        placementLabel.accessibilityIdentifier = "placement"
+
+        let stack = UIStackView(arrangedSubviews: [gameOverTitle, rankPill, scoreCaption, finalScoreLabel, bestLabel, placementLabel, divider, retryLabel])
         stack.axis = .vertical
         stack.spacing = 10
         stack.alignment = .center
         stack.setCustomSpacing(16, after: rankPill)
         stack.setCustomSpacing(-4, after: scoreCaption)
-        stack.setCustomSpacing(16, after: bestLabel)
+        stack.setCustomSpacing(6, after: bestLabel)
+        stack.setCustomSpacing(16, after: placementLabel)
         stack.setCustomSpacing(16, after: divider)
         stack.translatesAutoresizingMaskIntoConstraints = false
         gameOverPanel.addSubview(stack)
@@ -399,6 +618,72 @@ final class GameViewController: UIViewController, GameHUD {
             stack.trailingAnchor.constraint(equalTo: gameOverPanel.trailingAnchor, constant: -32),
         ])
         pulse(retryLabel)
+    }
+
+    private func setupBoard() {
+        styleCard(boardCard, radius: 22, border: 3, alpha: 0.9, borderColor: Palette.accentGold)
+        boardCard.alpha = 0
+        boardCard.accessibilityIdentifier = "leaderboard"
+        let header = ArcadeLabel(size: 26)
+        header.display = "HIGH SCORES"
+        header.fill = Palette.accentGold
+        header.kern = 2
+        header.outlineWidth = 6
+        let rows = UIStackView(arrangedSubviews: [header])
+        rows.axis = .vertical
+        rows.alignment = .fill
+        rows.spacing = 6
+        rows.setCustomSpacing(12, after: header)
+        rows.translatesAutoresizingMaskIntoConstraints = false
+        for _ in 0..<K.leaderboardSize {
+            let row = ArcadeLabel(size: 22, monospacedDigits: true)
+            row.kern = 2
+            row.outlineWidth = 4
+            row.textAlignment = .center
+            boardRows.append(row)
+            rows.addArrangedSubview(row)
+        }
+        boardCard.addSubview(rows)
+        NSLayoutConstraint.activate([
+            boardCard.widthAnchor.constraint(equalToConstant: 260),
+            rows.topAnchor.constraint(equalTo: boardCard.topAnchor, constant: 18),
+            rows.bottomAnchor.constraint(equalTo: boardCard.bottomAnchor, constant: -18),
+            rows.leadingAnchor.constraint(equalTo: boardCard.leadingAnchor, constant: 22),
+            rows.trailingAnchor.constraint(equalTo: boardCard.trailingAnchor, constant: -22),
+        ])
+    }
+
+    private func fillBoard(_ board: [Int]) {
+        let ordinals = ["1ST", "2ND", "3RD", "4TH", "5TH"]
+        let colors = [Palette.accentGold, Palette.hudSilver, Palette.hotOrange, Palette.hudCream, Palette.hudCream]
+        for (i, row) in boardRows.enumerated() {
+            let value = i < board.count ? String(board[i]) : "---"
+            row.display = "\(ordinals[i])   \(value)"
+            row.fill = colors[i]
+        }
+    }
+
+    private func advanceAttract() {
+        guard !titleOverlay.isHidden else { return }
+        showingBoard.toggle()
+        let showBoard = showingBoard
+        UIView.animate(withDuration: 0.35) {
+            self.logoStack.alpha = showBoard ? 0 : 1
+            self.boardCard.alpha = showBoard ? 1 : 0
+        }
+        if showBoard {
+            boardCard.transform = CGAffineTransform(scaleX: 0.85, y: 0.85)
+            UIView.animate(withDuration: 0.45, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.8,
+                           options: [.allowUserInteraction]) {
+                self.boardCard.transform = .identity
+            }
+        }
+    }
+
+    private func resetAttract() {
+        showingBoard = false
+        logoStack.alpha = 1
+        boardCard.alpha = 0
     }
 
     // MARK: - Animation helpers
@@ -444,17 +729,25 @@ final class GameViewController: UIViewController, GameHUD {
 
     private func setupGestures() {
         let tap = UITapGestureRecognizer(target: self, action: #selector(onTap))
+        tap.delegate = self
         view.addGestureRecognizer(tap)
         for swipeDir: UISwipeGestureRecognizer.Direction in [.up, .down, .left, .right] {
             let swipe = UISwipeGestureRecognizer(target: self, action: #selector(onSwipe(_:)))
             swipe.direction = swipeDir
+            swipe.delegate = self
             view.addGestureRecognizer(swipe)
             tap.require(toFail: swipe)
         }
     }
 
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        !(touch.view is UIControl)
+    }
+
     @objc private func onTap() {
-        if game.state == .gameOver {
+        if game.isPaused {
+            game.setPaused(false)
+        } else if game.state == .gameOver {
             guard canRetry else { return }
             hideGameOver()
             game.restart()
@@ -496,6 +789,8 @@ final class GameViewController: UIViewController, GameHUD {
         DispatchQueue.main.async {
             self.gameOverPanel.isHidden = true
             self.scoreLabel.display = "0"
+            self.pauseButton.isHidden = false
+            UIView.animate(withDuration: 0.25) { self.pauseButton.alpha = 1 }
             UIView.animate(withDuration: 0.28) {
                 self.titleOverlay.alpha = 0
                 self.titleOverlay.transform = CGAffineTransform(scaleX: 1.08, y: 1.08)
@@ -506,11 +801,14 @@ final class GameViewController: UIViewController, GameHUD {
         }
     }
 
-    func hudShowTitle(best: Int) {
+    func hudShowTitle(best: Int, board: [Int]) {
         DispatchQueue.main.async {
             self.gameOverPanel.isHidden = true
             self.scoreLabel.display = "0"
             self.hiScoreLabel.display = "HI-SCORE  \(best)"
+            self.fillBoard(board)
+            self.resetAttract()
+            self.hidePauseChrome()
             self.titleOverlay.isHidden = false
             self.titleOverlay.transform = .identity
             UIView.animate(withDuration: 0.3) {
@@ -519,8 +817,15 @@ final class GameViewController: UIViewController, GameHUD {
         }
     }
 
-    func hudGameOver(score: Int, best: Int, creatine: Int, newBest: Bool) {
+    func hudGameOver(score: Int, best: Int, creatine: Int, newBest: Bool, placement: Int?) {
         DispatchQueue.main.async {
+            self.hidePauseChrome()
+            if let placement {
+                self.placementLabel.display = "#\(placement) ON THE BOARD"
+                self.placementLabel.isHidden = false
+            } else {
+                self.placementLabel.isHidden = true
+            }
             self.rankLabel.display = Rank.title(for: score)
             self.rankPill.backgroundColor = Rank.color(for: score)
             self.bestLabel.display = newBest && score > 0 ? "★  NEW RECORD!  ★" : "BEST  \(best)"
@@ -533,6 +838,87 @@ final class GameViewController: UIViewController, GameHUD {
             self.countUp(to: score)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.canRetry = true
+            }
+        }
+    }
+
+    private func hidePauseChrome() {
+        pauseButton.isHidden = true
+        pauseButton.alpha = 0
+        pauseOverlay.isHidden = true
+        pauseOverlay.alpha = 0
+    }
+
+    func hudSkin(_ skin: Skin, next: Skin?, total: Int) {
+        DispatchQueue.main.async {
+            self.skinLabel.display = "◀  \(skin.name)  ▶"
+            self.skinLabel.fill = skin.fur
+            if let next {
+                self.skinHint.display = "SWIPE ◀ ▶  ·  \(next.name) AT \(next.unlockAt) CREATINE"
+            } else {
+                self.skinHint.display = "SWIPE ◀ ▶  ·  ALL OTTERS UNLOCKED"
+            }
+            self.skinCard.layer.borderColor = skin.fur.cgColor
+            self.pop(self.skinCard, scale: 1.1)
+        }
+    }
+
+    func hudCombo(_ combo: Int) {
+        DispatchQueue.main.async {
+            if combo >= K.comboShowAt {
+                self.comboLabel.layer.removeAllAnimations()
+                self.comboLabel.display = "x\(combo) COMBO"
+                self.comboLabel.fill = combo >= K.comboBonusEvery ? Palette.hotOrange : Palette.accentGold
+                self.comboLabel.alpha = 1
+                self.pop(self.comboLabel, scale: 1.3, duration: 0.24)
+            } else if self.comboLabel.alpha > 0 {
+                UIView.animate(withDuration: 0.25) { self.comboLabel.alpha = 0 }
+            }
+        }
+    }
+
+    func hudToast(_ text: String, color: UIColor) {
+        DispatchQueue.main.async {
+            self.toastLabel.display = text
+            self.toastLabel.fill = color
+            self.toastLabel.layer.removeAllAnimations()
+            self.toastLabel.alpha = 1
+            self.toastLabel.transform = CGAffineTransform(scaleX: 0.5, y: 0.5)
+            UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.5, initialSpringVelocity: 1.4,
+                           options: [.allowUserInteraction]) {
+                self.toastLabel.transform = .identity
+            }
+            UIView.animate(withDuration: 0.4, delay: 0.7, options: [.allowUserInteraction]) {
+                self.toastLabel.alpha = 0
+                self.toastLabel.transform = CGAffineTransform(translationX: 0, y: -30)
+            }
+        }
+    }
+
+    func hudPaused(_ paused: Bool) {
+        DispatchQueue.main.async {
+            if paused {
+                self.refreshSoundLabel()
+                self.pauseOverlay.isHidden = false
+                self.slamIn(self.pauseOverlay.subviews.first ?? self.pauseOverlay)
+                UIView.animate(withDuration: 0.2) { self.pauseOverlay.alpha = 1 }
+            } else {
+                UIView.animate(withDuration: 0.18) {
+                    self.pauseOverlay.alpha = 0
+                } completion: { _ in
+                    if !self.game.isPaused { self.pauseOverlay.isHidden = true }
+                }
+            }
+        }
+    }
+
+    func hudHaptic(_ kind: Haptic) {
+        DispatchQueue.main.async {
+            switch kind {
+            case .light: self.lightTap.impactOccurred(intensity: 0.6)
+            case .medium: self.mediumTap.impactOccurred()
+            case .heavy: self.heavyTap.impactOccurred()
+            case .success: self.notifier.notificationOccurred(.success)
             }
         }
     }

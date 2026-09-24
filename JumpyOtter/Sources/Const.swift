@@ -31,6 +31,58 @@ enum K {
 
     // arcade milestone banner cadence (rows)
     static let milestoneEvery = 25
+
+    // forward hops landing within this window of the previous one chain a combo
+    static let comboWindow: Float = 0.6
+    // every N combo hops pays out a bonus creatine
+    static let comboBonusEvery = 10
+    static let comboShowAt = 3
+    // clearance past a car's bumper that still counts as a close call when leaving a lane
+    static let closeCallMargin: Float = 0.55
+    static let leaderboardSize = 5
+}
+
+/// Unlockable otter colourways, earned with lifetime creatine.
+struct Skin {
+    let name: String
+    let fur: UIColor
+    let dark: UIColor
+    let belly: UIColor
+    let unlockAt: Int
+}
+
+enum Skins {
+    static let all: [Skin] = [
+        Skin(name: "CLASSIC", fur: Palette.otter, dark: Palette.otterDark, belly: Palette.otterCream, unlockAt: 0),
+        Skin(name: "ARCTIC",
+             fur: UIColor(red: 0.94, green: 0.96, blue: 0.99, alpha: 1),
+             dark: UIColor(red: 0.74, green: 0.82, blue: 0.92, alpha: 1),
+             belly: UIColor(red: 0.62, green: 0.86, blue: 1.00, alpha: 1), unlockAt: 10),
+        Skin(name: "GOLDEN",
+             fur: UIColor(red: 1.00, green: 0.84, blue: 0.24, alpha: 1),
+             dark: UIColor(red: 0.88, green: 0.64, blue: 0.10, alpha: 1),
+             belly: UIColor(red: 1.00, green: 0.97, blue: 0.80, alpha: 1), unlockAt: 25),
+        Skin(name: "MIDNIGHT",
+             fur: UIColor(red: 0.38, green: 0.34, blue: 0.62, alpha: 1),
+             dark: UIColor(red: 0.24, green: 0.21, blue: 0.44, alpha: 1),
+             belly: UIColor(red: 0.45, green: 0.95, blue: 0.90, alpha: 1), unlockAt: 50),
+        Skin(name: "CHERRY",
+             fur: UIColor(red: 1.00, green: 0.55, blue: 0.68, alpha: 1),
+             dark: UIColor(red: 0.86, green: 0.36, blue: 0.52, alpha: 1),
+             belly: UIColor(red: 1.00, green: 0.93, blue: 0.95, alpha: 1), unlockAt: 100),
+    ]
+
+    static func isUnlocked(_ index: Int, total: Int) -> Bool {
+        all.indices.contains(index) && total >= all[index].unlockAt
+    }
+
+    static func next(after total: Int) -> Skin? {
+        all.first { $0.unlockAt > total }
+    }
+}
+
+enum Haptic {
+    case light, medium, heavy, success
 }
 
 /// Arcade rank awarded on the game-over card.

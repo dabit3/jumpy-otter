@@ -33,7 +33,37 @@ object K {
 
     // arcade milestone banner cadence (rows)
     const val milestoneEvery = 25
+
+    // forward hops landing within this window of the previous one chain a combo
+    const val comboWindow = 0.6f
+    // every N combo hops pays out a bonus creatine
+    const val comboBonusEvery = 10
+    const val comboShowAt = 3
+    // clearance past a car's bumper that still counts as a close call when leaving a lane
+    const val closeCallMargin = 0.55f
+    const val leaderboardSize = 5
 }
+
+/** Unlockable otter colourways, earned with lifetime creatine. */
+class Skin(val name: String, val fur: Rgb, val dark: Rgb, val belly: Rgb, val unlockAt: Int)
+
+object Skins {
+    val all: List<Skin> by lazy {
+        listOf(
+            Skin("CLASSIC", Palette.otter, Palette.otterDark, Palette.otterCream, 0),
+            Skin("ARCTIC", Rgb(0.94f, 0.96f, 0.99f), Rgb(0.74f, 0.82f, 0.92f), Rgb(0.62f, 0.86f, 1.00f), 10),
+            Skin("GOLDEN", Rgb(1.00f, 0.84f, 0.24f), Rgb(0.88f, 0.64f, 0.10f), Rgb(1.00f, 0.97f, 0.80f), 25),
+            Skin("MIDNIGHT", Rgb(0.38f, 0.34f, 0.62f), Rgb(0.24f, 0.21f, 0.44f), Rgb(0.45f, 0.95f, 0.90f), 50),
+            Skin("CHERRY", Rgb(1.00f, 0.55f, 0.68f), Rgb(0.86f, 0.36f, 0.52f), Rgb(1.00f, 0.93f, 0.95f), 100),
+        )
+    }
+
+    fun isUnlocked(index: Int, total: Int): Boolean = index in all.indices && total >= all[index].unlockAt
+
+    fun next(total: Int): Skin? = all.firstOrNull { it.unlockAt > total }
+}
+
+enum class Haptic { LIGHT, MEDIUM, HEAVY, SUCCESS }
 
 /** Arcade rank awarded on the game-over card. */
 object Rank {

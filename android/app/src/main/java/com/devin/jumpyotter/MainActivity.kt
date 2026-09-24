@@ -14,6 +14,7 @@ import android.os.Bundle
 import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
@@ -83,10 +84,30 @@ class MainActivity : Activity(), GameHUD {
     private val rivalChips = HashMap<Int, Pair<View, ArcadeTextView>>()
     private lateinit var bannerLabel: ArcadeTextView
     private lateinit var flashView: View
+    private lateinit var comboLabel: ArcadeTextView
+    private lateinit var toastLabel: ArcadeTextView
+    private lateinit var pauseButton: View
+    private lateinit var pauseOverlay: FrameLayout
+    private lateinit var soundButton: ArcadeTextView
+    private lateinit var rootView: View
 
     // overlays
     private lateinit var titleOverlay: LinearLayout
     private lateinit var hiScoreLabel: ArcadeTextView
+    private lateinit var logoColumn: LinearLayout
+    private lateinit var boardCard: LinearLayout
+    private val boardRows = ArrayList<ArcadeTextView>()
+    private var showingBoard = false
+    private lateinit var skinCard: LinearLayout
+    private lateinit var skinLabel: ArcadeTextView
+    private lateinit var skinHint: ArcadeTextView
+    private lateinit var placementLabel: ArcadeTextView
+    private val attractTick = object : Runnable {
+        override fun run() {
+            advanceAttract()
+            rootView.postDelayed(this, 4500)
+        }
+    }
     private lateinit var gameOverPanel: LinearLayout
     private lateinit var rankPill: TextView
     private lateinit var finalScoreLabel: ArcadeTextView
@@ -119,11 +140,14 @@ class MainActivity : Activity(), GameHUD {
         setupVignette(root)
         setupHUD(root)
         setupOverlays(root)
+        setupPause(root)
         setContentView(root)
+        rootView = root
         setupGestures(root)
         hideSystemBars()
         game.hud = this
-        showTitle(prefs.getInt("best", 0))
+        game.presentTitle()
+        root.postDelayed(attractTick, 4500)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -150,11 +174,13 @@ class MainActivity : Activity(), GameHUD {
     }
 
     override fun onPause() {
+        game.setPaused(true)
         glView.onPause()
         super.onPause()
     }
 
     override fun onDestroy() {
+        rootView.removeCallbacks(attractTick)
         countUp?.cancel()
         game.destroy()
         sound.release()
@@ -266,8 +292,92 @@ class MainActivity : Activity(), GameHUD {
         bannerLabel = arcade(28f, Palette.accentGold, outlineDp = 4f, letterSpacing = 0.06f).apply { alpha = 0f }
         root.addView(bannerLabel, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.TOP).apply { topMargin = dp(120f) })
 
+        comboLabel = arcade(20f, Palette.accentGold, outlineDp = 3f, letterSpacing = 0.06f).apply {
+            alpha = 0f
+            contentDescription = "combo"
+        }
+        root.addView(comboLabel, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP or Gravity.START).apply {
+            topMargin = dp(112f); leftMargin = dp(18f)
+        })
+
+        toastLabel = arcade(26f, Palette.hotOrange, outlineDp = 4f, letterSpacing = 0.06f).apply { alpha = 0f }
+        root.addView(toastLabel, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER).apply { bottomMargin = dp(120f) })
+
+        val bars = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            background = cardBackground(Palette.hudNavy, Palette.hudCream, radiusDp = 999f, alpha = 0.85f)
+            elevation = dpf(6f)
+            isClickable = true
+            contentDescription = "pause"
+            visibility = View.GONE
+            setOnClickListener { game.setPaused(true) }
+        }
+        repeat(2) { i ->
+            bars.addView(View(this).apply { background = pillBackground(Palette.hudCream.toArgb(), 2f) },
+                LinearLayout.LayoutParams(dp(5f), dp(16f)).apply { if (i == 1) leftMargin = dp(5f) })
+        }
+        pauseButton = bars
+        root.addView(pauseButton, FrameLayout.LayoutParams(dp(44f), dp(44f), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply {
+            topMargin = dp(34f)
+        })
+
         flashView = View(this).apply { alpha = 0f; isClickable = false }
         root.addView(flashView, FrameLayout.LayoutParams(MATCH, MATCH))
+    }
+
+    private fun setupPause(root: FrameLayout) {
+        pauseOverlay = FrameLayout(this).apply {
+            setBackgroundColor(Color.argb(128, 0, 0, 0))
+            visibility = View.GONE
+        }
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            background = cardBackground(Palette.hudInk, Palette.hotOrange, radiusDp = 26f, alpha = 0.94f)
+            setPadding(dp(34f), dp(26f), dp(34f), dp(26f))
+            elevation = dpf(10f)
+        }
+        val title = arcade(44f, Palette.hotOrange, "PAUSED", outlineDp = 5f, letterSpacing = 0.08f)
+        soundButton = arcade(15f, Palette.accentGold, outlineDp = 0f, letterSpacing = 0.15f).apply {
+            setShadowLayer(0f, 0f, 0f, 0)
+            setPadding(dp(18f), dp(8f), dp(18f), dp(8f))
+            isClickable = true
+            contentDescription = "soundToggle"
+            setOnClickListener {
+                sound.enabled = !sound.enabled
+                refreshSoundButton()
+                pop(this, 1.12f)
+                haptic(Haptic.LIGHT)
+            }
+        }
+        refreshSoundButton()
+        val resume = arcade(20f, Palette.hudCream, "TAP TO RESUME", outlineDp = 3f, letterSpacing = 0.12f)
+        card.addView(title, wrap())
+        card.addView(soundButton, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(20f) })
+        card.addView(resume, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(22f) })
+        pauseOverlay.addView(card, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER).apply { bottomMargin = dp(60f) })
+        root.addView(pauseOverlay, FrameLayout.LayoutParams(MATCH, MATCH))
+        pulse(resume)
+    }
+
+    private fun refreshSoundButton() {
+        val on = sound.enabled
+        val color = if (on) Palette.accentGold else Palette.hudSilver
+        soundButton.text = if (on) "♪  SOUND ON" else "♪  SOUND OFF"
+        soundButton.setFill(color.toArgb())
+        soundButton.background = pillBackground(Palette.hudNavy.toArgb()).apply { setStroke(dp(2f), color.toArgb()) }
+    }
+
+    private fun haptic(kind: Haptic) {
+        val constant = when (kind) {
+            Haptic.LIGHT -> HapticFeedbackConstants.KEYBOARD_TAP
+            Haptic.MEDIUM -> HapticFeedbackConstants.VIRTUAL_KEY
+            Haptic.HEAVY -> HapticFeedbackConstants.LONG_PRESS
+            Haptic.SUCCESS -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) HapticFeedbackConstants.CONFIRM
+                else HapticFeedbackConstants.VIRTUAL_KEY
+        }
+        rootView.performHapticFeedback(constant)
     }
 
     // MARK: - Title / game over
@@ -289,13 +399,52 @@ class MainActivity : Activity(), GameHUD {
         val steer = arcade(14f, Palette.hudCream, "SWIPE TO STEER", outlineDp = 2.5f, letterSpacing = 0.2f)
         val credits = arcade(12f, Palette.hudCream, "1UP  ·  CREDITS 99  ·  PRESS TO START", outlineDp = 2.5f, letterSpacing = 0.18f)
 
+        logoColumn = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        logoColumn.addView(logoTop, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(6f) })
+        logoColumn.addView(logoBottom, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = -dp(14f) })
+        logoColumn.addView(hiScoreLabel, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(14f) })
+
+        // attract swap: logo <-> high-score table
+        boardCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            background = cardBackground(Palette.hudNavy, Palette.accentGold, radiusDp = 22f, alpha = 0.9f)
+            setPadding(dp(26f), dp(14f), dp(26f), dp(14f))
+            elevation = dpf(8f)
+            alpha = 0f
+            contentDescription = "leaderboard"
+        }
+        boardCard.addView(arcade(24f, Palette.accentGold, "HIGH SCORES", outlineDp = 4f, letterSpacing = 0.08f), wrap())
+        repeat(K.leaderboardSize) { i ->
+            val row = arcade(20f, Palette.hudCream, outlineDp = 3f, letterSpacing = 0.1f)
+            boardRows.add(row)
+            boardCard.addView(row, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(if (i == 0) 8f else 3f) })
+        }
+        val attract = FrameLayout(this)
+        attract.addView(logoColumn, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER))
+        attract.addView(boardCard, FrameLayout.LayoutParams(dp(250f), WRAP, Gravity.CENTER))
+
+        skinLabel = arcade(22f, Palette.otter, outlineDp = 3f, letterSpacing = 0.1f).apply { contentDescription = "skinName" }
+        skinHint = arcade(10f, Palette.hudSilver, outlineDp = 0f, letterSpacing = 0.12f).apply { setShadowLayer(0f, 0f, 0f, 0) }
+        skinCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(20f), dp(8f), dp(20f), dp(9f))
+            elevation = dpf(6f)
+            contentDescription = "skinCard"
+        }
+        skinCard.addView(skinLabel, wrap())
+        skinCard.addView(skinHint, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(2f) })
+
         titleOverlay.addView(ribbon, wrap())
-        titleOverlay.addView(logoTop, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(6f) })
-        titleOverlay.addView(logoBottom, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = -dp(14f) })
-        titleOverlay.addView(hiScoreLabel, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(14f) })
-        titleOverlay.addView(tap, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(40f) })
+        titleOverlay.addView(attract, wrap())
+        titleOverlay.addView(skinCard, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(28f) })
+        titleOverlay.addView(tap, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(22f) })
         titleOverlay.addView(steer, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(6f) })
-        titleOverlay.addView(credits, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(48f) })
+        titleOverlay.addView(credits, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(40f) })
         root.addView(titleOverlay, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.TOP).apply { topMargin = dp(96f) })
         pulse(tap)
         bob(logoTop, 6f, 1400L)
@@ -324,11 +473,13 @@ class MainActivity : Activity(), GameHUD {
         finalScoreLabel = arcade(56f, Palette.hudCream, "0", outlineDp = 4f).apply { contentDescription = "finalScore" }
         bestLabel = arcade(18f, Palette.accentGold, outlineDp = 2f, letterSpacing = 0.1f)
         val retry = arcade(20f, Palette.hudCream, "TAP TO RETRY", outlineDp = 3f, letterSpacing = 0.12f)
+        placementLabel = arcade(15f, Palette.hudCream, outlineDp = 2f, letterSpacing = 0.12f).apply { contentDescription = "placement" }
         gameOverPanel.addView(title, wrap())
         gameOverPanel.addView(rankPill, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(10f) })
         gameOverPanel.addView(scoreCaption, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(16f) })
         gameOverPanel.addView(finalScoreLabel, wrap())
         gameOverPanel.addView(bestLabel, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(8f) })
+        gameOverPanel.addView(placementLabel, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(6f) })
         gameOverPanel.addView(retry, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(22f) })
         root.addView(gameOverPanel, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER).apply { bottomMargin = dp(60f) })
         pulse(retry)
@@ -357,8 +508,45 @@ class MainActivity : Activity(), GameHUD {
         }.start()
     }
 
-    private fun showTitle(best: Int) {
+    private fun fillBoard(board: List<Int>) {
+        val ordinals = listOf("1ST", "2ND", "3RD", "4TH", "5TH")
+        val colors = listOf(Palette.accentGold, Palette.hudSilver, Palette.hotOrange, Palette.hudCream, Palette.hudCream)
+        boardRows.forEachIndexed { i, row ->
+            row.text = "${ordinals[i]}   ${board.getOrNull(i)?.toString() ?: "---"}"
+            row.setFill(colors[i].toArgb())
+        }
+    }
+
+    private fun advanceAttract() {
+        if (titleOverlay.visibility != View.VISIBLE) return
+        showingBoard = !showingBoard
+        logoColumn.animate().alpha(if (showingBoard) 0f else 1f).setDuration(350).start()
+        boardCard.animate().cancel()
+        if (showingBoard) {
+            boardCard.scaleX = 0.85f; boardCard.scaleY = 0.85f
+            boardCard.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(420)
+                .setInterpolator(OvershootInterpolator(1.8f)).start()
+        } else {
+            boardCard.animate().alpha(0f).setDuration(350).start()
+        }
+    }
+
+    private fun resetAttract() {
+        showingBoard = false
+        logoColumn.animate().cancel(); logoColumn.alpha = 1f
+        boardCard.animate().cancel(); boardCard.alpha = 0f
+    }
+
+    private fun hidePauseChrome() {
+        pauseButton.visibility = View.GONE
+        pauseOverlay.visibility = View.GONE
+    }
+
+    private fun showTitle(best: Int, board: List<Int>) {
         hiScoreLabel.text = "HI-SCORE  $best"
+        fillBoard(board)
+        resetAttract()
+        hidePauseChrome()
         gameOverPanel.visibility = View.GONE
         scoreLabel.text = "0"
         titleOverlay.animate().cancel()
@@ -398,7 +586,9 @@ class MainActivity : Activity(), GameHUD {
     }
 
     private fun onTap() {
-        if (game.state == GameController.State.GAME_OVER) {
+        if (game.isPaused) {
+            game.setPaused(false)
+        } else if (game.state == GameController.State.GAME_OVER) {
             if (!canRetry) return
             countUp?.cancel()
             gameOverPanel.animate().cancel()
@@ -433,6 +623,7 @@ class MainActivity : Activity(), GameHUD {
         runOnUiThread {
             gameOverPanel.visibility = View.GONE
             scoreLabel.text = "0"
+            pauseButton.visibility = View.VISIBLE
             titleOverlay.animate().cancel()
             titleOverlay.animate().alpha(0f).scaleX(1.12f).scaleY(1.12f).setDuration(240).withEndAction {
                 if (game.state != GameController.State.TITLE) titleOverlay.visibility = View.GONE
@@ -440,15 +631,86 @@ class MainActivity : Activity(), GameHUD {
         }
     }
 
-    override fun hudShowTitle(best: Int) {
+    override fun hudShowTitle(best: Int, board: List<Int>) {
         runOnUiThread {
             if (game.state != GameController.State.TITLE) return@runOnUiThread
-            showTitle(best)
+            showTitle(best, board)
         }
     }
 
-    override fun hudGameOver(score: Int, best: Int, creatine: Int, newBest: Boolean) {
+    override fun hudSkin(skin: Skin, next: Skin?, total: Int) {
         runOnUiThread {
+            skinLabel.text = "◀  ${skin.name}  ▶"
+            skinLabel.setFill(skin.fur.toArgb())
+            skinHint.text = if (next != null) "SWIPE ◀ ▶  ·  ${next.name} AT ${next.unlockAt} CREATINE"
+                else "SWIPE ◀ ▶  ·  ALL OTTERS UNLOCKED"
+            skinCard.background = cardBackground(Palette.hudNavy, skin.fur, radiusDp = 18f, alpha = 0.85f)
+            pop(skinCard, 1.1f)
+        }
+    }
+
+    override fun hudCombo(combo: Int) {
+        runOnUiThread {
+            if (combo >= K.comboShowAt) {
+                comboLabel.text = "x$combo COMBO"
+                comboLabel.setFill((if (combo >= K.comboBonusEvery) Palette.hotOrange else Palette.accentGold).toArgb())
+                comboLabel.alpha = 1f
+                pop(comboLabel, 1.3f)
+            } else if (comboLabel.alpha > 0f) {
+                comboLabel.animate().cancel()
+                comboLabel.animate().alpha(0f).setDuration(250).start()
+            }
+        }
+    }
+
+    override fun hudToast(text: String, color: Rgb) {
+        runOnUiThread {
+            toastLabel.text = text
+            toastLabel.setFill(color.toArgb())
+            toastLabel.animate().cancel()
+            toastLabel.alpha = 1f
+            toastLabel.translationY = 0f
+            toastLabel.scaleX = 0.5f; toastLabel.scaleY = 0.5f
+            toastLabel.animate().scaleX(1f).scaleY(1f).setDuration(260).setInterpolator(OvershootInterpolator(2.4f))
+                .withEndAction {
+                    toastLabel.animate().alpha(0f).translationY(-dpf(30f)).setStartDelay(450).setDuration(400).start()
+                }.start()
+        }
+    }
+
+    override fun hudPaused(paused: Boolean) {
+        runOnUiThread {
+            pauseOverlay.animate().cancel()
+            if (paused) {
+                refreshSoundButton()
+                pauseOverlay.alpha = 0f
+                pauseOverlay.visibility = View.VISIBLE
+                pauseOverlay.animate().alpha(1f).setDuration(200).start()
+                pauseOverlay.getChildAt(0)?.let { card ->
+                    card.scaleX = 1.3f; card.scaleY = 1.3f
+                    card.animate().scaleX(1f).scaleY(1f).setDuration(360).setInterpolator(OvershootInterpolator(1.6f)).start()
+                }
+            } else {
+                pauseOverlay.animate().alpha(0f).setDuration(180).withEndAction {
+                    if (!game.isPaused) pauseOverlay.visibility = View.GONE
+                }.start()
+            }
+        }
+    }
+
+    override fun hudHaptic(kind: Haptic) {
+        runOnUiThread { haptic(kind) }
+    }
+
+    override fun hudGameOver(score: Int, best: Int, creatine: Int, newBest: Boolean, placement: Int?) {
+        runOnUiThread {
+            hidePauseChrome()
+            if (placement != null) {
+                placementLabel.text = "#$placement ON THE BOARD"
+                placementLabel.visibility = View.VISIBLE
+            } else {
+                placementLabel.visibility = View.GONE
+            }
             rankPill.text = Rank.title(score)
             rankPill.background = pillBackground(Rank.color(score).toArgb())
             if (newBest) {

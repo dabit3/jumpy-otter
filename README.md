@@ -18,6 +18,19 @@ and credits line, milestone and NEW RECORD banners, a ranked game-over card
 puffs, pickup sparkles, death flashes, flowers, water foam and glowing pickup
 pads in the world.
 
+Extras on both platforms:
+
+- **Otter skins** — CLASSIC, ARCTIC (10), GOLDEN (25), MIDNIGHT (50), CHERRY (100)
+  unlock with lifetime creatine; swipe left/right on the title screen to pick one.
+- **Top-5 high-score table** — alternates with the logo on the attract screen;
+  the game-over card shows `#N ON THE BOARD` when a run places.
+- **Hop combos** — quick consecutive forward hops build an `xN COMBO` meter; every
+  10th combo hop pays out a bonus creatine.
+- **Close calls** — leaving a lane just ahead of an oncoming car flashes `CLOSE CALL!`.
+- **Pause menu** — pause button during a run (auto-pauses when the app is
+  backgrounded) with a persisted sound on/off toggle.
+- **Haptics** on hops, pickups, close calls, records and deaths.
+
 ## Run in Xcode
 
 1. Open `JumpyOtter.xcodeproj`.

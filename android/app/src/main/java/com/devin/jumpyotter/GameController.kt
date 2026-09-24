@@ -7,6 +7,7 @@ import com.devin.jumpyotter.engine.MoveBy
 import com.devin.jumpyotter.engine.MoveTo
 import com.devin.jumpyotter.engine.Node
 import com.devin.jumpyotter.engine.RemoveFromParent
+import com.devin.jumpyotter.engine.RotateBy
 import com.devin.jumpyotter.engine.RotateTo
 import com.devin.jumpyotter.engine.Run
 import com.devin.jumpyotter.engine.ScaleTo
@@ -21,9 +22,17 @@ import kotlin.math.roundToInt
 interface GameHUD {
     fun hudSetScore(score: Int)
     fun hudSetCreatine(creatine: Int)
-    fun hudGameOver(score: Int, best: Int, creatine: Int, newBest: Boolean)
+    /** [placement] is the 1-based leaderboard slot this run earned, if any. */
+    fun hudGameOver(score: Int, best: Int, creatine: Int, newBest: Boolean, placement: Int?)
     fun hudStarted()
-    fun hudShowTitle(best: Int)
+    fun hudShowTitle(best: Int, board: List<Int>)
+    /** Selected skin plus the next locked one (null once everything is unlocked). */
+    fun hudSkin(skin: Skin, next: Skin?, total: Int)
+    fun hudCombo(combo: Int)
+    /** Small pop-up callout near the player (close calls, combo bonuses). */
+    fun hudToast(text: String, color: Rgb)
+    fun hudPaused(paused: Boolean)
+    fun hudHaptic(kind: Haptic)
     fun hudSetRivals(rivals: List<RivalStatus>)
     fun hudBanner(text: String, color: Rgb)
     /** Full-screen colour flash (deaths, records); alpha in 0..1. */
@@ -46,9 +55,16 @@ class GameController(
 
     val renderer = SceneRenderer()
     var hud: GameHUD? = null
-        set(value) { field = value; value?.hudSetCreatine(totalCreatine) }
+        set(value) {
+            field = value
+            value?.hudSetCreatine(totalCreatine)
+            value?.hudSkin(Skins.all[skinIndex], Skins.next(totalCreatine), totalCreatine)
+        }
 
     var state = State.TITLE
+        private set
+
+    @Volatile var isPaused = false
         private set
 
     // world
@@ -72,12 +88,23 @@ class GameController(
     private val inputLock = Any()
     private val inputQueue = ArrayList<Dir>()
     private var restartRequested = false
+    private var pendingSkinStep = 0
+    private var pendingPause: Boolean? = null
 
     // scoring
     private var score = 0
     private var creatineCollected = 0
     private var totalCreatine = prefs.getInt("totalCreatine", 0)
     private var best = prefs.getInt("best", 0)
+    private var board: List<Int> = prefs.getString("top5", null)
+        ?.split(',')?.mapNotNull { it.toIntOrNull() }
+        ?: if (best > 0) listOf(best) else emptyList()
+    private var skinIndex = prefs.getInt("skin", 0).let { if (Skins.isUnlocked(it, totalCreatine)) it else 0 }
+
+    // combo
+    private var clock = 0f
+    private var combo = 0
+    private var lastForwardLand = -10f
 
     // timing
     private var lastTime = -1L
@@ -133,8 +160,12 @@ class GameController(
         eagleNode = null
         playerNode.removeFromParent()
         garbageNodes.add(playerNode)
-        playerNode = VoxelFactory.wiskers()
+        playerNode = VoxelFactory.wiskers(Skins.all[skinIndex])
         playerNode.position.set(0f, 0f, 0f)
+        isPaused = false
+        combo = 0
+        lastForwardLand = -10f
+        hud?.hudCombo(0)
         worldNode.addChild(playerNode)
 
         playerRow = 0
@@ -179,12 +210,25 @@ class GameController(
     }
 
     fun handleSwipe(dir: Dir) {
-        if (state != State.PLAYING && state != State.TITLE) return
+        if (isPaused || (state != State.PLAYING && state != State.TITLE)) return
+        if (state == State.TITLE && (dir == Dir.LEFT || dir == Dir.RIGHT)) {
+            synchronized(inputLock) { pendingSkinStep += if (dir == Dir.RIGHT) 1 else -1 }
+            return
+        }
         if (state == State.TITLE) {
             state = State.PLAYING
             hud?.hudStarted()
         }
         enqueue(dir)
+    }
+
+    /** Requests pause/resume; only takes effect while a run is in progress. */
+    fun setPaused(paused: Boolean) {
+        synchronized(inputLock) { pendingPause = paused }
+    }
+
+    fun presentTitle() {
+        hud?.hudShowTitle(best, board)
     }
 
     fun restart() {
@@ -203,7 +247,47 @@ class GameController(
         if (!shouldRestart) return
         state = State.TITLE
         startFresh()
-        hud?.hudShowTitle(best)
+        hud?.hudShowTitle(best, board)
+    }
+
+    private fun applyPendingPause() {
+        val request = synchronized(inputLock) { pendingPause.also { pendingPause = null } } ?: return
+        if (request == isPaused) return
+        if (request && state != State.PLAYING) return
+        isPaused = request
+        hud?.hudPaused(request)
+    }
+
+    private fun applyPendingSkin() {
+        val step = synchronized(inputLock) { pendingSkinStep.also { pendingSkinStep = 0 } }
+        if (step == 0 || state != State.TITLE) return
+        val count = Skins.all.size
+        var idx = skinIndex
+        do {
+            idx = ((idx + Integer.signum(step)) % count + count) % count
+        } while (!Skins.isUnlocked(idx, totalCreatine))
+        if (idx == skinIndex) { bumpAnimation(); return }
+        skinIndex = idx
+        prefs.edit().putInt("skin", idx).apply()
+
+        val old = playerNode
+        val fresh = VoxelFactory.wiskers(Skins.all[idx])
+        fresh.position.set(playerX, old.position.y, playerRow.toFloat())
+        fresh.eulerAngles.set(old.eulerAngles.x, old.eulerAngles.y, old.eulerAngles.z)
+        old.removeFromParent()
+        garbageNodes.add(old)
+        worldNode.addChild(fresh)
+        playerNode = fresh
+        fresh.runAction(
+            Group(
+                RotateBy((Math.PI * 2).toFloat(), 0.4f).also { it.timing = Timing.EASE_OUT },
+                Sequence(MoveBy(0f, 0.6f, 0f, 0.2f), MoveBy(0f, -0.6f, 0f, 0.2f)),
+            )
+        )
+        spawnBurst(playerX, 0.5f, playerRow.toFloat(), Skins.all[idx].fur, 10, 0.05f, 0.1f, 0.9f)
+        sound.play(Sfx.COIN, 0.6f)
+        hud?.hudHaptic(Haptic.LIGHT)
+        hud?.hudSkin(Skins.all[idx], Skins.next(totalCreatine), totalCreatine)
     }
 
     private fun enqueue(dir: Dir) {
@@ -228,6 +312,19 @@ class GameController(
         lastTime = now
 
         applyPendingRestart()
+        applyPendingPause()
+        applyPendingSkin()
+        if (isPaused) {
+            renderer.target.set(cameraRig.position)
+            renderer.eye.set(cameraRig.position.x - 6.5f, cameraRig.position.y + 10.5f, cameraRig.position.z - 7.0f)
+            renderer.draw()
+            return
+        }
+        clock += dt
+        if (combo > 0 && clock - lastForwardLand > K.comboWindow + K.hopDuration) {
+            combo = 0
+            hud?.hudCombo(0)
+        }
         processMultiplayer(dt)
         updateRows(dt)
         if (autopilot) runAutopilot(dt)
@@ -392,10 +489,24 @@ class GameController(
             bumpAnimation(); return
         }
 
+        val current = terrain.rows[playerRow]
+        if (dir.dz != 0 && current != null && current.kind == RowKind.ROAD) {
+            val closeCall = current.objects.any {
+                val gap = abs(it.presentationX - playerX) - it.halfLen - K.playerHalfWidth
+                val approaching = (it.presentationX - playerX) * current.dir < 0
+                approaching && gap < K.closeCallMargin
+            }
+            if (closeCall) {
+                hud?.hudToast("CLOSE CALL!", Palette.hotOrange)
+                hud?.hudHaptic(Haptic.MEDIUM)
+            }
+        }
+
         isHopping = true
         ridingLog = null
         ridingRow = null
         sound.play(Sfx.HOP, 0.9f)
+        hud?.hudHaptic(Haptic.LIGHT)
 
         val targetY = targetRow.surfaceY
         val move = MoveTo(targetX, targetY, targetRowIndex.toFloat(), K.hopDuration).also { it.timing = Timing.EASE_OUT }
@@ -417,11 +528,21 @@ class GameController(
         if (rowIndex > score) {
             score = rowIndex
             hud?.hudSetScore(score)
+            combo = if (clock - lastForwardLand <= K.comboWindow + K.hopDuration) combo + 1 else 1
+            lastForwardLand = clock
+            hud?.hudCombo(combo)
+            if (combo % K.comboBonusEvery == 0) {
+                awardCreatine(1)
+                sound.play(Sfx.COIN, 0.7f)
+                hud?.hudToast("x$combo COMBO  +1", Palette.accentGold)
+                hud?.hudHaptic(Haptic.SUCCESS)
+            }
             if (score % K.milestoneEvery == 0) hud?.hudBanner("$score ROWS!", Palette.accentGold)
             if (score > best && !announcedRecord && best > 0) {
                 announcedRecord = true
                 hud?.hudBanner("NEW RECORD!", Palette.accentGold)
                 hud?.hudFlash(Palette.accentGold, 0.35f)
+                hud?.hudHaptic(Haptic.SUCCESS)
             }
         }
 
@@ -435,8 +556,8 @@ class GameController(
         val col = x.roundToInt()
         row.creatine.remove(col)?.let { bottle ->
             creatineCollected += 1
-            totalCreatine += 1
-            prefs.edit().putInt("totalCreatine", totalCreatine).apply()
+            awardCreatine(1)
+            hud?.hudHaptic(Haptic.SUCCESS)
             sound.play(Sfx.COIN, 0.9f)
             mp.sendGarbage(1)
             bottle.removeAllActions()
@@ -448,7 +569,6 @@ class GameController(
                 )
             )
             spawnBurst(x, 0.6f, rowIndex.toFloat(), Palette.accentGold, 10, 0.05f, 0.11f, 1.0f)
-            hud?.hudSetCreatine(totalCreatine)
         }
 
         sendStateIfChanged()
@@ -460,6 +580,19 @@ class GameController(
                 ridingRow = row
             } else {
                 drown()
+            }
+        }
+    }
+
+    private fun awardCreatine(amount: Int) {
+        val before = totalCreatine
+        totalCreatine += amount
+        prefs.edit().putInt("totalCreatine", totalCreatine).apply()
+        hud?.hudSetCreatine(totalCreatine)
+        for (skin in Skins.all) {
+            if (skin.unlockAt in (before + 1)..totalCreatine) {
+                hud?.hudBanner("${skin.name} OTTER UNLOCKED!", skin.fur)
+                hud?.hudFlash(skin.fur, 0.35f)
             }
         }
     }
@@ -537,6 +670,7 @@ class GameController(
         eagleTriggered = true
         state = State.DYING
         sound.play(Sfx.EAGLE, 1.0f)
+        hud?.hudHaptic(Haptic.HEAVY)
 
         val px = playerNode.position.x
         val pz = playerNode.position.z
@@ -575,8 +709,9 @@ class GameController(
         val pz = playerNode.position.z
         playerNode.scale.set(1.5f, 0.08f, 1.5f)
         playerNode.position.y = terrain.rows[pz.roundToInt()]?.surfaceY ?: 0f
-        spawnBurst(px, 0.4f, pz, Palette.otter, 14)
+        spawnBurst(px, 0.4f, pz, Skins.all[skinIndex].fur, 14)
         shakeCamera()
+        hud?.hudHaptic(Haptic.HEAVY)
         hud?.hudFlash(Palette.dangerRed, 0.45f)
         after(0.8f) { finishGameOver() }
     }
@@ -588,6 +723,7 @@ class GameController(
         isHopping = false
         spawnBurst(playerX, 0.2f, playerRow.toFloat(), Palette.waterFoam, 16)
         hud?.hudFlash(Palette.water, 0.4f)
+        hud?.hudHaptic(Haptic.HEAVY)
         val sink = Group(
             MoveBy(0f, -1.2f, 0f, 0.45f).also { it.timing = Timing.EASE_IN },
             FadeOut(0.45f).also { it.timing = Timing.EASE_IN },
@@ -609,7 +745,15 @@ class GameController(
             best = score
             prefs.edit().putInt("best", best).apply()
         }
-        hud?.hudGameOver(score, best, totalCreatine, newBest)
+        var placement: Int? = null
+        if (score > 0) {
+            board = (board + score).sortedDescending().take(K.leaderboardSize)
+            placement = board.indexOf(score).takeIf { it >= 0 }?.plus(1)
+            prefs.edit().putString("top5", board.joinToString(",")).apply()
+        }
+        combo = 0
+        hud?.hudCombo(0)
+        hud?.hudGameOver(score, best, totalCreatine, newBest, placement)
         mp.sendGameOver(score)
         mp.sendState(playerRow, playerX, score, false)
     }
