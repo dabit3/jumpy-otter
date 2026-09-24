@@ -290,7 +290,7 @@ class MainActivity : Activity(), GameHUD {
         })
 
         bannerLabel = arcade(28f, Palette.accentGold, outlineDp = 4f, letterSpacing = 0.06f).apply { alpha = 0f }
-        root.addView(bannerLabel, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.TOP).apply { topMargin = dp(120f) })
+        root.addView(bannerLabel, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.TOP).apply { topMargin = dp(156f) })
 
         comboLabel = arcade(20f, Palette.accentGold, outlineDp = 3f, letterSpacing = 0.06f).apply {
             alpha = 0f
