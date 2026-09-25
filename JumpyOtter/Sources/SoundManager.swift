@@ -9,6 +9,10 @@ final class SoundManager {
     private var cursors: [String: Int] = [:]
     private let queue = DispatchQueue(label: "sound")
 
+    var enabled: Bool = UserDefaults.standard.object(forKey: "soundOn") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(enabled, forKey: "soundOn") }
+    }
+
     private init() {
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
@@ -27,6 +31,7 @@ final class SoundManager {
     }
 
     func play(_ name: String, volume: Float = 1.0) {
+        guard enabled else { return }
         queue.async { [self] in
             guard let pool = pools[name], !pool.isEmpty else { return }
             let i = (cursors[name] ?? 0) % pool.count

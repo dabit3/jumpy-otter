@@ -20,40 +20,40 @@ enum VoxelFactory {
 
     // MARK: - Wiskers (player), built facing +Z
 
-    static func wiskers() -> SCNNode {
+    static func wiskers(skin: Skin = Skins.all[0]) -> SCNNode {
         let root = SCNNode()
         root.name = "wiskers"
         // long tapered tail
-        root.addChildNode(box(w: 0.28, h: 0.24, l: 0.42, color: Palette.otterDark, x: -0.04, y: 0.25, z: -0.37, chamfer: 0.06))
-        let tailMiddle = box(w: 0.23, h: 0.19, l: 0.38, color: Palette.otterDark, x: 0.05, y: 0.18, z: -0.69, chamfer: 0.05)
+        root.addChildNode(box(w: 0.28, h: 0.24, l: 0.42, color: skin.dark, x: -0.04, y: 0.25, z: -0.37, chamfer: 0.06))
+        let tailMiddle = box(w: 0.23, h: 0.19, l: 0.38, color: skin.dark, x: 0.05, y: 0.18, z: -0.69, chamfer: 0.05)
         tailMiddle.eulerAngles.y = -0.28
         root.addChildNode(tailMiddle)
-        let tailTip = box(w: 0.16, h: 0.14, l: 0.30, color: Palette.otter, x: 0.16, y: 0.13, z: -0.96, chamfer: 0.05)
+        let tailTip = box(w: 0.16, h: 0.14, l: 0.30, color: skin.fur, x: 0.16, y: 0.13, z: -0.96, chamfer: 0.05)
         tailTip.eulerAngles.y = -0.38
         root.addChildNode(tailTip)
         // body and cream belly
-        root.addChildNode(box(w: 0.50, h: 0.52, l: 0.48, color: Palette.otterDark, y: 0.34, chamfer: 0.08))
-        root.addChildNode(box(w: 0.34, h: 0.34, l: 0.07, color: Palette.otterCream, y: 0.38, z: 0.275, chamfer: 0.05))
+        root.addChildNode(box(w: 0.50, h: 0.52, l: 0.48, color: skin.dark, y: 0.34, chamfer: 0.08))
+        root.addChildNode(box(w: 0.34, h: 0.34, l: 0.07, color: skin.belly, y: 0.38, z: 0.275, chamfer: 0.05))
         // arms
-        root.addChildNode(box(w: 0.11, h: 0.34, l: 0.22, color: Palette.otter, x: 0.29, y: 0.39, z: 0.03, chamfer: 0.04))
-        root.addChildNode(box(w: 0.11, h: 0.34, l: 0.22, color: Palette.otter, x: -0.29, y: 0.39, z: 0.03, chamfer: 0.04))
+        root.addChildNode(box(w: 0.11, h: 0.34, l: 0.22, color: skin.fur, x: 0.29, y: 0.39, z: 0.03, chamfer: 0.04))
+        root.addChildNode(box(w: 0.11, h: 0.34, l: 0.22, color: skin.fur, x: -0.29, y: 0.39, z: 0.03, chamfer: 0.04))
         // feet
-        root.addChildNode(box(w: 0.22, h: 0.15, l: 0.30, color: Palette.otter, x: 0.15, y: 0.075, z: 0.10, chamfer: 0.06))
-        root.addChildNode(box(w: 0.22, h: 0.15, l: 0.30, color: Palette.otter, x: -0.15, y: 0.075, z: 0.10, chamfer: 0.06))
+        root.addChildNode(box(w: 0.22, h: 0.15, l: 0.30, color: skin.fur, x: 0.15, y: 0.075, z: 0.10, chamfer: 0.06))
+        root.addChildNode(box(w: 0.22, h: 0.15, l: 0.30, color: skin.fur, x: -0.15, y: 0.075, z: 0.10, chamfer: 0.06))
         // head and ears
-        root.addChildNode(box(w: 0.57, h: 0.43, l: 0.46, color: Palette.otter, y: 0.76, z: 0.05, chamfer: 0.09))
-        root.addChildNode(box(w: 0.15, h: 0.17, l: 0.18, color: Palette.otterDark, x: 0.31, y: 0.86, z: 0.01, chamfer: 0.06))
-        root.addChildNode(box(w: 0.15, h: 0.17, l: 0.18, color: Palette.otterDark, x: -0.31, y: 0.86, z: 0.01, chamfer: 0.06))
-        root.addChildNode(box(w: 0.08, h: 0.09, l: 0.04, color: Palette.otter, x: 0.315, y: 0.86, z: 0.115, chamfer: 0.03))
-        root.addChildNode(box(w: 0.08, h: 0.09, l: 0.04, color: Palette.otter, x: -0.315, y: 0.86, z: 0.115, chamfer: 0.03))
+        root.addChildNode(box(w: 0.57, h: 0.43, l: 0.46, color: skin.fur, y: 0.76, z: 0.05, chamfer: 0.09))
+        root.addChildNode(box(w: 0.15, h: 0.17, l: 0.18, color: skin.dark, x: 0.31, y: 0.86, z: 0.01, chamfer: 0.06))
+        root.addChildNode(box(w: 0.15, h: 0.17, l: 0.18, color: skin.dark, x: -0.31, y: 0.86, z: 0.01, chamfer: 0.06))
+        root.addChildNode(box(w: 0.08, h: 0.09, l: 0.04, color: skin.fur, x: 0.315, y: 0.86, z: 0.115, chamfer: 0.03))
+        root.addChildNode(box(w: 0.08, h: 0.09, l: 0.04, color: skin.fur, x: -0.315, y: 0.86, z: 0.115, chamfer: 0.03))
         // eyes and highlights
         root.addChildNode(box(w: 0.075, h: 0.13, l: 0.055, color: Palette.black, x: 0.16, y: 0.82, z: 0.295, chamfer: 0.025))
         root.addChildNode(box(w: 0.075, h: 0.13, l: 0.055, color: Palette.black, x: -0.16, y: 0.82, z: 0.295, chamfer: 0.025))
         root.addChildNode(box(w: 0.025, h: 0.035, l: 0.02, color: Palette.white, x: 0.148, y: 0.85, z: 0.334, chamfer: 0.01))
         root.addChildNode(box(w: 0.025, h: 0.035, l: 0.02, color: Palette.white, x: -0.172, y: 0.85, z: 0.334, chamfer: 0.01))
         // white cheek muzzle and black nose
-        root.addChildNode(box(w: 0.24, h: 0.17, l: 0.07, color: Palette.otterCream, x: 0.105, y: 0.68, z: 0.315, chamfer: 0.06))
-        root.addChildNode(box(w: 0.24, h: 0.17, l: 0.07, color: Palette.otterCream, x: -0.105, y: 0.68, z: 0.315, chamfer: 0.06))
+        root.addChildNode(box(w: 0.24, h: 0.17, l: 0.07, color: skin.belly, x: 0.105, y: 0.68, z: 0.315, chamfer: 0.06))
+        root.addChildNode(box(w: 0.24, h: 0.17, l: 0.07, color: skin.belly, x: -0.105, y: 0.68, z: 0.315, chamfer: 0.06))
         root.addChildNode(box(w: 0.15, h: 0.105, l: 0.09, color: Palette.black, y: 0.735, z: 0.375, chamfer: 0.04))
         root.addChildNode(box(w: 0.035, h: 0.08, l: 0.035, color: Palette.black, y: 0.65, z: 0.37, chamfer: 0.01))
         // whiskers
@@ -69,6 +69,26 @@ enum VoxelFactory {
         flat.name = "wiskers"
         flat.castsShadow = true
         return flat
+    }
+
+    // MARK: - Ground decoration
+
+    static func flower(color: UIColor) -> SCNNode {
+        let root = SCNNode()
+        root.addChildNode(box(w: 0.05, h: 0.22, l: 0.05, color: Palette.leafDark, y: 0.11, chamfer: 0))
+        root.addChildNode(box(w: 0.16, h: 0.07, l: 0.16, color: color, y: 0.25, chamfer: 0.02))
+        root.addChildNode(box(w: 0.07, h: 0.075, l: 0.07, color: Palette.accentGold, y: 0.26, chamfer: 0))
+        root.castsShadow = false
+        return root
+    }
+
+    static func grassTuft() -> SCNNode {
+        let root = SCNNode()
+        for (dx, dz, h) in [(-0.07, 0.03, 0.16), (0.06, -0.05, 0.22), (0.0, 0.07, 0.13)] as [(Float, Float, CGFloat)] {
+            root.addChildNode(box(w: 0.06, h: h, l: 0.06, color: Palette.grassTuft, x: dx, y: Float(h / 2), z: dz, chamfer: 0))
+        }
+        root.castsShadow = false
+        return root
     }
 
     // MARK: - Trees
@@ -278,8 +298,23 @@ enum VoxelFactory {
         root.addChildNode(box(w: 0.13, h: 0.025, l: 0.015, color: Palette.white, x: -0.015, y: 0.30, z: 0.173, chamfer: 0.005))
         root.addChildNode(box(w: 0.13, h: 0.025, l: 0.015, color: Palette.white, x: -0.015, y: 0.18, z: 0.173, chamfer: 0.005))
         root.addChildNode(box(w: 0.025, h: 0.14, l: 0.015, color: Palette.white, x: -0.068, y: 0.24, z: 0.173, chamfer: 0.005))
+        // glowing pickup pad so collectibles read from across the screen
+        let pad = box(w: 0.62, h: 0.03, l: 0.62, color: Palette.accentGold, y: -0.165, chamfer: 0.01)
+        pad.geometry?.firstMaterial?.emission.contents = Palette.accentGold
+        pad.opacity = 0.55
+        pad.castsShadow = false
+        pad.runAction(.repeatForever(.sequence([
+            .group([.scale(to: 1.25, duration: 0.7), .fadeOpacity(to: 0.15, duration: 0.7)]),
+            .group([.scale(to: 1.0, duration: 0.7), .fadeOpacity(to: 0.55, duration: 0.7)]),
+        ])))
+        root.addChildNode(pad)
         root.position.y = 0.18
         root.runAction(.repeatForever(.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 1.8)))
+        let bobUp = SCNAction.moveBy(x: 0, y: 0.12, z: 0, duration: 0.6)
+        bobUp.timingMode = .easeInEaseOut
+        let bobDown = SCNAction.moveBy(x: 0, y: -0.12, z: 0, duration: 0.6)
+        bobDown.timingMode = .easeInEaseOut
+        root.runAction(.repeatForever(.sequence([bobUp, bobDown])))
         return root
     }
 

@@ -28,16 +28,116 @@ enum K {
     // multiplayer garbage: road traffic speed surge on rivals
     static let garbageSpeedBoost: Float = 1.7
     static let garbageBoostSeconds: Float = 4.0
+
+    // arcade milestone banner cadence (rows)
+    static let milestoneEvery = 25
+
+    // forward hops landing within this window of the previous one chain a combo
+    static let comboWindow: Float = 0.6
+    // every N combo hops pays out a bonus creatine
+    static let comboBonusEvery = 10
+    static let comboShowAt = 3
+    // clearance past a car's bumper that still counts as a close call when leaving a lane
+    static let closeCallMargin: Float = 0.55
+    static let leaderboardSize = 5
+}
+
+/// Unlockable otter colourways, earned with lifetime creatine.
+struct Skin {
+    let name: String
+    let fur: UIColor
+    let dark: UIColor
+    let belly: UIColor
+    let unlockAt: Int
+
+    /// Fur colour, or the lighter belly colour when the fur is too dark to read on navy HUD cards.
+    var labelColor: UIColor {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        fur.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return 0.299 * r + 0.587 * g + 0.114 * b < 0.5 ? belly : fur
+    }
+}
+
+enum Skins {
+    static let all: [Skin] = [
+        Skin(name: "CLASSIC", fur: Palette.otter, dark: Palette.otterDark, belly: Palette.otterCream, unlockAt: 0),
+        Skin(name: "ARCTIC",
+             fur: UIColor(red: 0.94, green: 0.96, blue: 0.99, alpha: 1),
+             dark: UIColor(red: 0.74, green: 0.82, blue: 0.92, alpha: 1),
+             belly: UIColor(red: 0.62, green: 0.86, blue: 1.00, alpha: 1), unlockAt: 10),
+        Skin(name: "GOLDEN",
+             fur: UIColor(red: 1.00, green: 0.84, blue: 0.24, alpha: 1),
+             dark: UIColor(red: 0.88, green: 0.64, blue: 0.10, alpha: 1),
+             belly: UIColor(red: 1.00, green: 0.97, blue: 0.80, alpha: 1), unlockAt: 25),
+        Skin(name: "MIDNIGHT",
+             fur: UIColor(red: 0.38, green: 0.34, blue: 0.62, alpha: 1),
+             dark: UIColor(red: 0.24, green: 0.21, blue: 0.44, alpha: 1),
+             belly: UIColor(red: 0.45, green: 0.95, blue: 0.90, alpha: 1), unlockAt: 50),
+        Skin(name: "CHERRY",
+             fur: UIColor(red: 1.00, green: 0.55, blue: 0.68, alpha: 1),
+             dark: UIColor(red: 0.86, green: 0.36, blue: 0.52, alpha: 1),
+             belly: UIColor(red: 1.00, green: 0.93, blue: 0.95, alpha: 1), unlockAt: 100),
+    ]
+
+    static func isUnlocked(_ index: Int, total: Int) -> Bool {
+        all.indices.contains(index) && total >= all[index].unlockAt
+    }
+
+    static func next(after total: Int) -> Skin? {
+        all.first { $0.unlockAt > total }
+    }
+}
+
+enum Haptic {
+    case light, medium, heavy, success
+}
+
+/// Arcade rank awarded on the game-over card.
+enum Rank {
+    static func title(for score: Int) -> String {
+        switch score {
+        case ..<10: return "ROOKIE"
+        case ..<25: return "HOPPER"
+        case ..<50: return "PRO"
+        case ..<100: return "LEGEND"
+        default: return "OTTERLORD"
+        }
+    }
+
+    static func color(for score: Int) -> UIColor {
+        switch score {
+        case ..<10: return Palette.hudSilver
+        case ..<25: return Palette.leaf
+        case ..<50: return Palette.window
+        case ..<100: return Palette.accentGold
+        default: return Palette.hotOrange
+        }
+    }
 }
 
 enum Palette {
-    static let grassLight = UIColor(red: 0.46, green: 0.72, blue: 0.38, alpha: 1)
-    static let grassDark  = UIColor(red: 0.40, green: 0.66, blue: 0.34, alpha: 1)
-    static let grassSide  = UIColor(red: 0.31, green: 0.52, blue: 0.30, alpha: 1)
-    static let road       = UIColor(red: 0.25, green: 0.27, blue: 0.30, alpha: 1)
+    static let grassLight = UIColor(red: 0.52, green: 0.80, blue: 0.38, alpha: 1)
+    static let grassDark  = UIColor(red: 0.45, green: 0.73, blue: 0.33, alpha: 1)
+    static let grassSide  = UIColor(red: 0.30, green: 0.52, blue: 0.27, alpha: 1)
+    static let grassTuft  = UIColor(red: 0.36, green: 0.66, blue: 0.28, alpha: 1)
+    static let road       = UIColor(red: 0.22, green: 0.23, blue: 0.28, alpha: 1)
     static let roadSide   = UIColor(red: 0.25, green: 0.26, blue: 0.30, alpha: 1)
-    static let water      = UIColor(red: 0.24, green: 0.58, blue: 0.72, alpha: 1)
-    static let riverBed   = UIColor(red: 0.16, green: 0.40, blue: 0.52, alpha: 1)
+    static let water      = UIColor(red: 0.20, green: 0.62, blue: 0.86, alpha: 1)
+    static let riverBed   = UIColor(red: 0.12, green: 0.38, blue: 0.58, alpha: 1)
+    static let waterFoam  = UIColor(red: 0.80, green: 0.93, blue: 0.99, alpha: 1)
+    static let flowerColors: [UIColor] = [
+        UIColor(red: 0.98, green: 0.45, blue: 0.62, alpha: 1),
+        UIColor(red: 1.00, green: 0.86, blue: 0.25, alpha: 1),
+        UIColor(red: 0.98, green: 0.98, blue: 0.98, alpha: 1),
+        UIColor(red: 0.60, green: 0.55, blue: 0.95, alpha: 1),
+    ]
+    // HUD / arcade chrome
+    static let hudNavy    = UIColor(red: 0.07, green: 0.09, blue: 0.20, alpha: 1)
+    static let hudInk     = UIColor(red: 0.10, green: 0.07, blue: 0.16, alpha: 1)
+    static let hudCream   = UIColor(red: 1.00, green: 0.96, blue: 0.86, alpha: 1)
+    static let hudSilver  = UIColor(red: 0.80, green: 0.84, blue: 0.90, alpha: 1)
+    static let hotOrange  = UIColor(red: 1.00, green: 0.45, blue: 0.15, alpha: 1)
+    static let dangerRed  = UIColor(red: 0.95, green: 0.20, blue: 0.22, alpha: 1)
     static let sidewalk   = UIColor(red: 0.72, green: 0.70, blue: 0.66, alpha: 1)
     static let curb       = UIColor(red: 0.88, green: 0.86, blue: 0.80, alpha: 1)
     static let railBed    = UIColor(red: 0.48, green: 0.46, blue: 0.42, alpha: 1)
@@ -57,7 +157,7 @@ enum Palette {
     static let beakOrange = UIColor(red: 0.95, green: 0.58, blue: 0.13, alpha: 1)
     static let black      = UIColor(red: 0.13, green: 0.13, blue: 0.16, alpha: 1)
     static let accentGold = UIColor(red: 1.00, green: 0.84, blue: 0.20, alpha: 1)
-    static let sky        = UIColor(red: 0.66, green: 0.80, blue: 0.84, alpha: 1)
+    static let sky        = UIColor(red: 0.53, green: 0.78, blue: 0.95, alpha: 1)
     static let wheel      = UIColor(red: 0.15, green: 0.15, blue: 0.18, alpha: 1)
     static let window     = UIColor(red: 0.55, green: 0.80, blue: 0.95, alpha: 1)
     static let cableRed   = UIColor(red: 0.72, green: 0.13, blue: 0.12, alpha: 1)
